@@ -61,9 +61,9 @@ export default function Home() {
       {/* Header Section */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Olá, Contador</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Meus Casos</h1>
           <p className="text-lg text-muted-foreground">
-            Gerencie seus arquivos e inicie novos casos.
+            Gerencie seus arquivos contábeis e inicie novos processamentos.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm dark:bg-card">

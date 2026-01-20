@@ -7,14 +7,14 @@ import { LayoutDashboard, FolderOpen, Settings, Plug, LogOut } from "lucide-reac
 
 const sidebarItems = [
     {
+        title: "Meus Casos",
+        href: "/",
+        icon: FolderOpen,
+    },
+    {
         title: "Dashboard",
         href: "/dashboard",
         icon: LayoutDashboard,
-    },
-    {
-        title: "Meus Casos",
-        href: "/", // Assuming Home is "Meus Casos" or similar workflow
-        icon: FolderOpen,
     },
     {
         title: "Configurações",
