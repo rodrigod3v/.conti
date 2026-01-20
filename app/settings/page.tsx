@@ -1,26 +1,52 @@
-"use client";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function SettingsPage() {
-    const [responsibles, setResponsibles] = useState(["Carlos Mendes", "Ana Silva", "Roberto Junior"]);
+    const [responsibles, setResponsibles] = useState<string[]>([]);
+    const [statusList, setStatusList] = useState<string[]>([]);
     const [newResponsible, setNewResponsible] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Fetch settings on load
+    useEffect(() => {
+        fetch('/api/settings')
+            .then(res => res.json())
+            .then(data => {
+                setResponsibles(data.responsibles || []);
+                setStatusList(data.status || []);
+                setIsLoading(false);
+            })
+            .catch(err => console.error(err));
+    }, []);
+
+    const saveSettings = async (newResponsibles: string[], newStatus: string[]) => {
+        await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ responsibles: newResponsibles, status: newStatus })
+        });
+    };
 
     const addResponsible = () => {
         if (newResponsible.trim()) {
-            setResponsibles([...responsibles, newResponsible.trim()]);
+            const updated = [...responsibles, newResponsible.trim()];
+            setResponsibles(updated);
             setNewResponsible("");
+            saveSettings(updated, statusList);
         }
     };
 
     const removeResponsible = (index: number) => {
-        setResponsibles(responsibles.filter((_, i) => i !== index));
+        const updated = responsibles.filter((_, i) => i !== index);
+        setResponsibles(updated);
+        saveSettings(updated, statusList);
     };
+
+    if (isLoading) return <div>Carregando configurações...</div>;
 
     return (
         <div className="space-y-6">

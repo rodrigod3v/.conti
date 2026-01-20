@@ -22,7 +22,30 @@ export default function Home() {
 
       if (jsonData.length > 0) {
         const headers = Object.keys(jsonData[0] as object);
-        setFileData(jsonData as any[], headers, file.name);
+
+        // Save to Database
+        try {
+          const response = await fetch('/api/files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: file.name,
+              size: file.size,
+              rows: jsonData
+            })
+          });
+
+          if (!response.ok) throw new Error("Falha ao salvar no banco");
+
+          const savedFile = await response.json();
+          // Update store with new file ID (for Data Editor context)
+          setFileData(jsonData as any[], headers, file.name); // Using local data for immediate feedback, but could fetch
+          // Ideally store the savedFile.id in the store too
+        } catch (dbError) {
+          console.error("Erro de persistência:", dbError);
+          alert("Erro ao salvar no banco de dados, mas carregando visualização...");
+        }
+
         router.push("/editor");
       } else {
         alert("O arquivo parece estar vazio.");

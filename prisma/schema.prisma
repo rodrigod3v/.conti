@@ -1,0 +1,37 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model File {
+  id        String   @id @default(cuid())
+  name      String
+  size      Int
+  status    String   @default("Processed") // Processed, Pending, Error
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  rows      Row[]
+}
+
+model Row {
+  id        String   @id @default(cuid())
+  fileId    String
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  data      String   // JSON string storing the dynamic column data
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Setting {
+  id           String @id @default("config")
+  responsibles String // JSON array of names
+  status       String // JSON array of custom statuses
+}

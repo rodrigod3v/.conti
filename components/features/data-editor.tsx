@@ -27,13 +27,27 @@ export function DataEditor() {
         );
     }
 
-    const handleSave = () => {
+    const handleSave = async () => {
         setIsSaving(true);
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            const response = await fetch('/api/rows', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fileId: 'current-file-id-todo', // TODO: Get real ID from store
+                    rows: fileData
+                })
+            });
+
+            if (!response.ok) throw new Error("Falha ao salvar");
+
+            alert("Dados salvos com sucesso no banco de dados!");
+        } catch (error) {
+            console.error("Erro ao salvar:", error);
+            alert("Erro ao salvar alterações.");
+        } finally {
             setIsSaving(false);
-            alert("Dados salvos com sucesso! (Simulação)");
-        }, 1000);
+        }
     };
 
     return (
