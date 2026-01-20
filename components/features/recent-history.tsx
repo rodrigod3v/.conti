@@ -1,41 +1,118 @@
-import { FileSpreadsheet, MoreHorizontal } from "lucide-react";
+import { FileSpreadsheet, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAppStore } from "@/lib/store";
 
-const recentFiles = [
-    {
-        id: 1,
-        name: "Balanço_Anual_2023.xlsx",
-        date: "12 Out 2023",
-        status: "Processado",
-        size: "12.4 MB",
-    },
-    {
-        id: 2,
-        name: "Clientes_Inadimplentes_Nov.csv",
-        date: "10 Nov 2023",
-        status: "Pendente",
-        size: "2.1 MB",
-    },
-    {
-        id: 3,
-        name: "Fluxo_Caixa_Q4.xlsx",
-        date: "15 Jan 2024",
-        status: "Em Análise",
-        size: "5.8 MB",
-    },
-];
+interface FileRecord {
+    id: string;
+    name: string;
+    createdAt: string;
+    updatedAt: string;
+    status: string;
+    size: number;
+}
+
+function formatBytes(bytes: number, decimals = 1) {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+
+function formatDate(dateString: string) {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+
+    return `${day}/${month}/${year} as ${hours}:${minutes}h`;
+}
+
+const statusMap: Record<string, string> = {
+    'Processed': 'Processado',
+    'Pending': 'Pendente',
+    'Error': 'Erro'
+};
 
 export function RecentHistory() {
+    const [files, setFiles] = useState<FileRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false); // Added isExpanded state
+    const router = useRouter();
+    const { setFileData } = useAppStore();
+
+    useEffect(() => {
+        async function fetchFiles() {
+            try {
+                const response = await fetch('/api/files');
+                if (response.ok) {
+                    const data = await response.json();
+                    setFiles(data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch files", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchFiles();
+    }, []);
+
+    const handleOpenFile = async (fileId: string) => {
+        try {
+            const response = await fetch(`/api/files/${fileId}`);
+            if (!response.ok) throw new Error("Failed to fetch file details");
+
+            const fileData = await response.json();
+
+            if (fileData.rows && fileData.rows.length > 0) {
+                // Parse the JSON string data from each row
+                const parsedRows = fileData.rows.map((row: any) => JSON.parse(row.data));
+                const headers = Object.keys(parsedRows[0]);
+
+                setFileData(parsedRows, headers, fileData.name);
+                router.push("/editor");
+            } else {
+                alert("Este arquivo não possui dados.");
+            }
+
+        } catch (error) {
+            console.error("Error opening file:", error);
+            alert("Erro ao abrir o arquivo.");
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="rounded-2xl border bg-white shadow-sm dark:bg-card p-6 flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
+
+    const displayedFiles = isExpanded ? files : files.slice(0, 3); // Sliced files based on state
+
     return (
         <div className="rounded-2xl border bg-white shadow-sm dark:bg-card">
             <div className="flex items-center justify-between border-b px-6 py-4">
                 <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold text-foreground">Histórico Recente</h2>
                 </div>
-                <Button variant="ghost" className="text-sm text-muted-foreground hover:text-foreground">
-                    Ver todos
-                </Button>
+                {files.length > 3 && ( // Conditionally render button
+                    <Button
+                        variant="ghost"
+                        className="text-sm text-muted-foreground hover:text-foreground"
+                        onClick={() => setIsExpanded(!isExpanded)} // Toggle logic
+                    >
+                        {isExpanded ? "Ver menos" : "Ver todos"} {/* Button text changes */}
+                    </Button>
+                )}
             </div>
 
             <div className="overflow-x-auto">
@@ -49,41 +126,53 @@ export function RecentHistory() {
                         </tr>
                     </thead>
                     <tbody className="divide-y">
-                        {recentFiles.map((file) => (
-                            <tr key={file.id} className="group hover:bg-muted/20">
-                                <td className="whitespace-nowrap px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                                            <FileSpreadsheet className="h-5 w-5" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-foreground">{file.name}</p>
-                                            <p className="text-xs text-muted-foreground">{file.size}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="whitespace-nowrap px-6 py-4 text-muted-foreground">
-                                    {file.date}
-                                </td>
-                                <td className="whitespace-nowrap px-6 py-4">
-                                    <Badge
-                                        variant="outline"
-                                        className={`
-                        ${file.status === 'Processado' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : ''}
-                        ${file.status === 'Pendente' ? 'border-amber-200 bg-amber-50 text-amber-700' : ''}
-                        ${file.status === 'Em Análise' ? 'border-blue-200 bg-blue-50 text-blue-700' : ''}
-                    `}
-                                    >
-                                        {file.status}
-                                    </Badge>
-                                </td>
-                                <td className="whitespace-nowrap px-6 py-4 text-right">
-                                    <Button variant="ghost" className="font-medium text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700">
-                                        Abrir
-                                    </Button>
+                        {files.length === 0 ? (
+                            <tr>
+                                <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
+                                    Nenhum arquivo recente encontrado.
                                 </td>
                             </tr>
-                        ))}
+                        ) : (
+                            displayedFiles.map((file) => ( // Used displayedFiles
+                                <tr key={file.id} className="group hover:bg-muted/20">
+                                    <td className="whitespace-nowrap px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                                                <FileSpreadsheet className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-foreground">{file.name}</p>
+                                                <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="whitespace-nowrap px-6 py-4 text-muted-foreground">
+                                        {formatDate(file.updatedAt || file.createdAt)} {/* Used updatedAt */}
+                                    </td>
+                                    <td className="whitespace-nowrap px-6 py-4">
+                                        <Badge
+                                            variant="outline"
+                                            className={`
+                                            ${(statusMap[file.status] || file.status) === 'Processado' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : ''}
+                                            ${(statusMap[file.status] || file.status) === 'Pendente' ? 'border-amber-200 bg-amber-50 text-amber-700' : ''}
+                                            ${(statusMap[file.status] || file.status) === 'Erro' ? 'border-red-200 bg-red-50 text-red-700' : ''}
+                                        `}
+                                        >
+                                            {statusMap[file.status] || file.status}
+                                        </Badge>
+                                    </td>
+                                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                                        <Button
+                                            variant="ghost"
+                                            className="font-medium text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                                            onClick={() => handleOpenFile(file.id)}
+                                        >
+                                            Abrir
+                                        </Button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>

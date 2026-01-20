@@ -1,55 +1,89 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAppStore } from "@/lib/store";
+import { Card, CardContent } from "@/components/ui/card";
 import { FileSpreadsheet, CheckCircle, Clock, AlertCircle } from "lucide-react";
 
 export function KpiCards() {
+    const { fileData, headers } = useAppStore();
+
+    // Helper to find likely columns
+    const findColumn = (keywords: string[]) =>
+        headers.find(h => keywords.some(k => h.toLowerCase().includes(k.toLowerCase())));
+
+    const statusCol = findColumn(['status', 'estado', 'situação']);
+
+    // Default counts
+    let total = fileData.length;
+    let pending = 0;
+    let inProgress = 0;
+    let completed = 0;
+
+    if (statusCol) {
+        fileData.forEach(row => {
+            const val = String(row[statusCol] || '').toLowerCase();
+            if (val.includes('pendente') || val.includes('aguardando')) pending++;
+            else if (val.includes('andamento') || val.includes('análise') || val.includes('analise')) inProgress++;
+            else if (val.includes('conclui') || val.includes('finaliz') || val.includes('pago') || val.includes('ok')) completed++;
+        });
+    }
+
     const kpis = [
         {
             title: "Total de Casos",
-            value: "1,248",
-            description: "+180 vs mês anterior",
+            value: total.toString(),
+            badge: total > 0 ? "100%" : "0%",
+            badgeColor: "bg-emerald-50 text-emerald-700",
             icon: FileSpreadsheet,
-            color: "text-blue-600",
-        },
-        {
-            title: "Processados",
-            value: "892",
-            description: "71% do total",
-            icon: CheckCircle,
-            color: "text-emerald-600",
+            iconColor: "text-blue-600",
+            iconBg: "bg-blue-100",
         },
         {
             title: "Pendentes",
-            value: "356",
-            description: "Ação necessária",
-            icon: Clock,
-            color: "text-amber-600",
+            value: pending.toString(),
+            badge: total > 0 ? `${Math.round((pending / total) * 100)}%` : "0%",
+            badgeColor: "bg-orange-50 text-orange-700",
+            icon: AlertCircle,
+            iconColor: "text-orange-600",
+            iconBg: "bg-orange-100",
         },
         {
-            title: "Com Erro",
-            value: "12",
-            description: "Requer atenção",
-            icon: AlertCircle,
-            color: "text-red-600",
+            title: "Em Andamento",
+            value: inProgress.toString(),
+            badge: total > 0 ? `${Math.round((inProgress / total) * 100)}%` : "0%",
+            badgeColor: "bg-pink-50 text-pink-700",
+            icon: Clock,
+            iconColor: "text-purple-600",
+            iconBg: "bg-purple-100",
+        },
+        {
+            title: "Concluidos",
+            value: completed.toString(),
+            badge: total > 0 ? `${Math.round((completed / total) * 100)}%` : "0%",
+            badgeColor: "bg-emerald-50 text-emerald-700",
+            icon: CheckCircle,
+            iconColor: "text-emerald-600",
+            iconBg: "bg-emerald-100",
         },
     ];
 
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {kpis.map((kpi) => (
-                <Card key={kpi.title}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            {kpi.title}
-                        </CardTitle>
-                        <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{kpi.value}</div>
-                        <p className="text-xs text-muted-foreground">
-                            {kpi.description}
-                        </p>
+                <Card key={kpi.title} className="shadow-sm">
+                    <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                            <div className={`p-3 rounded-lg ${kpi.iconBg}`}>
+                                <kpi.icon className={`h-6 w-6 ${kpi.iconColor}`} />
+                            </div>
+                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${kpi.badgeColor}`}>
+                                {kpi.badge}
+                            </span>
+                        </div>
+                        <div className="mt-4">
+                            <p className="text-sm font-medium text-muted-foreground">{kpi.title}</p>
+                            <h3 className="text-3xl font-bold mt-1">{kpi.value}</h3>
+                        </div>
                     </CardContent>
                 </Card>
             ))}

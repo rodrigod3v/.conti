@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FolderOpen, Settings, Plug, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Settings, Plug, LogOut, Home, Table2 } from "lucide-react";
 
 const sidebarItems = [
     {
-        title: "Meus Casos",
+        title: "Home",
         href: "/",
-        icon: FolderOpen,
+        icon: Home,
+    },
+    {
+        title: "Editor",
+        href: "/editor",
+        icon: Table2,
     },
     {
         title: "Dashboard",
@@ -28,8 +33,18 @@ const sidebarItems = [
     },
 ];
 
+import { useAppStore } from "@/lib/store";
+
 export function Sidebar() {
     const pathname = usePathname();
+    const { fileData } = useAppStore();
+
+    const displayedItems = sidebarItems.filter(item => {
+        if (item.title === "Editor" || item.title === "Dashboard") {
+            return fileData && fileData.length > 0;
+        }
+        return true;
+    });
 
     return (
         <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card transition-transform">
@@ -45,7 +60,7 @@ export function Sidebar() {
                 </div>
 
                 <ul className="space-y-2 font-medium">
-                    {sidebarItems.map((item) => {
+                    {displayedItems.map((item) => {
                         const isActive = pathname === item.href;
                         return (
                             <li key={item.href}>
