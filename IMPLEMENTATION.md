@@ -58,7 +58,7 @@ Implementamos um backend real para que os dados não sejam perdidos ao recarrega
 
 ### B. Interface do Usuário (Frontend)
 
-**1. Home (`/`) - Upload Inteligente**
+**1. Meus Casos (`/`) - Upload Inteligente**
 -   Componente `UploadZone` aceita arrastar e soltar.
 -   Valida extensões (`.xlsx`, `.csv`).
 -   Envia para à API para persistência imediata.
