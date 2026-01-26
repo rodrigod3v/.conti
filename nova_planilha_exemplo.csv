@@ -1,0 +1,4 @@
+Chamado,Observações,Data,Status do Pgto,Responsável,Área Responsável,Data do Pgto,Exceção,Empresa,Fornecedor,Nome do Fornecedor,Referencia,Ordem,Lançamento,Forma de Pgto,Data Lanç Contab,Data Vencimento,Montante,Valor Liquido,Texto de Item,№ ID Fiscal,Exercicio,Bloq Pgto Item,Tp Lanç Cont,PCC,IR,Base ISS
+CS-2025-001,Teste de observação,14/01/2025,Pendente,João Silva,Financeiro,15/01/2025,,,,,,,,0,0,0,,,45748,,5000.00,,,,,,,
+CS-2025-002,Revogar pagamento,14/01/2025,Aprovado,Maria Santos,RH,15/01/2025,,,,,,,,0,0,0,,,14/01/2025,,12500.50,,,,,,,
+CS-2025-003,Verificar aliquota,15/01/2025,Erro,Carlos Ferreira,Fiscal,16/01/2025,,,,,,,,0,0,0,,,15/01/2025,,789.00,,,,,,,
