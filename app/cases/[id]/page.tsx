@@ -23,58 +23,138 @@ import {
     Eye,
     Info,
     Smile,
-    AtSign
+    AtSign,
+    Save
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+    SheetFooter,
+    SheetClose
+} from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { useAppStore } from "@/lib/store";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 export default function CaseDetailsPage() {
     const params = useParams();
     const caseId = decodeURIComponent(params.id as string);
-    const { fileData } = useAppStore();
+    const { fileData, updateCell, comments, addComment } = useAppStore();
+    const [isEditOpen, setIsEditOpen] = useState(false);
+
+    // Comment State
+    const [newComment, setNewComment] = useState("");
+
+    // Edit State
+    const [editForm, setEditForm] = useState({
+        status: "",
+        responsible: "",
+        dueDate: "",
+        description: "",
+        descriptionField: ""
+    });
 
     const caseData = useMemo(() => {
-        const row = fileData.find(r => r["Caso"] === caseId);
-        if (!row) return null;
+        // Helper to get value case-insensitively
+        const getValue = (r: any, ...keys: string[]) => {
+            for (const key of keys) {
+                if (r[key] !== undefined) return r[key];
+                // Try case insensitive search
+                const lowerKey = key.toLowerCase();
+                const foundKey = Object.keys(r).find(k => k.toLowerCase() === lowerKey);
+                if (foundKey && r[foundKey] !== undefined) return r[foundKey];
+            }
+            return null;
+        };
+
+        const rowIndex = fileData.findIndex(r => {
+            const id = getValue(r, "Caso", "Chamado", "caso", "chamado");
+            return String(id) === caseId;
+        });
+
+        if (rowIndex === -1) return null;
+        const row = fileData[rowIndex];
+
+        const status = String(getValue(row, "Status", "status") || "Pendente");
+        const descriptionField = ["Inconsistencias", "inconsistencias", "Descrição", "descricao", "Observações", "observacoes"].find(k => row[k] !== undefined) || "Inconsistencias";
 
         return {
-            id: String(row["Caso"]),
-            title: row["Inconsistencias"] ? "Inconsistência Identificada" : "Lançamento Contábil",
-            description: row["Inconsistencias"] ? String(row["Inconsistencias"]) : "Nenhuma inconsistência relatada para este lançamento.",
-            status: String(row["Status"]),
+            rowIndex,
+            id: String(getValue(row, "Caso", "Chamado", "caso", "chamado") || caseId),
+            title: getValue(row, "Inconsistencias", "inconsistencias", "Descrição", "descricao")
+                ? "Inconsistência Identificada"
+                : "Lançamento Contábil",
+            description: String(getValue(row, descriptionField) || "Nenhuma inconsistência relatada para este lançamento."),
+            descriptionField,
+            status: status,
 
-            // Operational
-            client: String(row["Empresa"] || row["Nome do Fornecedor"] || "N/A"),
-            responsible: String(row["Responsável"] || row["Area Responsavel"] || "Não atribuído"),
-            supplier: String(row["Nome do Fornecedor"] || row["Fornecedor"]),
-            fiscalId: String(row["Numero do ID Fiscal"]),
+            // General Info
+            client: String(getValue(row, "Empresa", "empresa", "Cliente", "cliente") || getValue(row, "Nome do Fornecedor", "Fornecedor") || "N/A"),
+            responsible: String(getValue(row, "Responsável", "responsavel", "Usuario", "usuario", "Area Responsavel") || "Não atribuído"),
+            priority: status.toLowerCase() === "erro" || status.toLowerCase() === "alto" ? "Alta" : "Normal",
+            period: getValue(row, "Exercicio", "exercicio", "Periodo", "periodo") ? `Exercício ${getValue(row, "Exercicio", "exercicio")}` : "2023",
+            lastUpdate: "Há 2 horas", // Mock for now as spreadsheet usually doesn't have this
 
             // Dates
-            openedAt: String(row["Data"]),
-            paymentDate: String(row["Data do Pagamento"]),
-            accountingDate: String(row["Data Lancamento Contabil"]),
-            dueDate: String(row["Data Vencimento"]),
+            openedAt: String(getValue(row, "Data", "data", "Data Abertura") || "-"),
+            dueDate: String(getValue(row, "Data Vencimento", "vencimento") || "-"),
 
-            // Financial
-            value: row["Valor (R$)"] || row["Montante"],
-            netValue: row["Valor Liquido"],
-            paymentMethod: String(row["Forma de Pagamento"]),
-
-            // Taxes
-            pcc: row["PCC"],
-            ir: row["IR"],
-            issBase: row["Base ISS"],
-
-            // Meta
-            priority: String(row["Status"]).toLowerCase() === "erro" ? "Alta" : "Normal",
-            period: row["Exercicio"] ? `Exercício ${row["Exercicio"]}` : "2023",
-            lastUpdate: "Importado agora",
+            // Financial (Keep existing logic but safe access)
+            value: getValue(row, "Valor (R$)", "Valor", "montante"),
+            netValue: getValue(row, "Valor Liquido", "valor liquido"),
+            paymentMethod: String(getValue(row, "Forma de Pagamento", "forma pagamento") || "-"),
+            pcc: getValue(row, "PCC", "pcc"),
+            ir: getValue(row, "IR", "ir"),
+            issBase: getValue(row, "Base ISS", "base iss"),
         };
     }, [caseId, fileData]);
+
+    // Initialize edit form when caseData loads
+    useEffect(() => {
+        if (caseData) {
+            setEditForm({
+                status: caseData.status,
+                responsible: caseData.responsible,
+                dueDate: caseData.dueDate,
+                description: caseData.description,
+                descriptionField: caseData.descriptionField
+            });
+        }
+    }, [caseData]);
+
+    const handleSaveEdit = () => {
+        if (!caseData) return;
+
+        // Update Store
+        updateCell(caseData.rowIndex, "Status", editForm.status);
+        updateCell(caseData.rowIndex, "Responsável", editForm.responsible);
+        updateCell(caseData.rowIndex, "Data Vencimento", editForm.dueDate);
+        if (editForm.descriptionField) {
+            updateCell(caseData.rowIndex, editForm.descriptionField, editForm.description);
+        }
+
+        setIsEditOpen(false);
+    };
+
+    const handlePostComment = () => {
+        if (!newComment.trim()) return;
+
+        // Add comment to store (currentUser hardcoded as "Eu (Admin)" for now)
+        addComment(caseId, newComment, "Eu (Admin)");
+        setNewComment("");
+    };
+
+    // Get comments for this case
+    const caseComments = comments[caseId] || [];
 
     if (!caseData) {
         return (
@@ -121,10 +201,74 @@ export default function CaseDetailsPage() {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Button variant="outline" className="gap-2 font-bold">
-                            <Edit className="h-4 w-4" />
-                            Editar Caso
-                        </Button>
+                        <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
+                            <SheetTrigger asChild>
+                                <Button variant="outline" className="gap-2 font-bold">
+                                    <Edit className="h-4 w-4" />
+                                    Editar Caso
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent>
+                                <SheetHeader>
+                                    <SheetTitle>Editar Caso #{caseData.id}</SheetTitle>
+                                    <SheetDescription>
+                                        Faça alterações nas informações principais do caso.
+                                    </SheetDescription>
+                                </SheetHeader>
+                                <div className="grid gap-4 py-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="status">Status</Label>
+                                        <Select
+                                            value={editForm.status}
+                                            onValueChange={(val) => setEditForm({ ...editForm, status: val })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Selecione o status" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Pendente">Pendente</SelectItem>
+                                                <SelectItem value="Em Análise">Em Análise</SelectItem>
+                                                <SelectItem value="Aprovado">Aprovado</SelectItem>
+                                                <SelectItem value="Erro">Erro</SelectItem>
+                                                <SelectItem value="Cancelado">Cancelado</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="responsible">Responsável</Label>
+                                        <Input
+                                            id="responsible"
+                                            value={editForm.responsible}
+                                            onChange={(e) => setEditForm({ ...editForm, responsible: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="dueDate">Data de Vencimento</Label>
+                                        <Input
+                                            id="dueDate"
+                                            value={editForm.dueDate}
+                                            onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="description">Descrição/Observação</Label>
+                                        <Textarea
+                                            id="description"
+                                            value={editForm.description}
+                                            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                            className="min-h-[100px]"
+                                        />
+                                    </div>
+                                </div>
+                                <SheetFooter>
+                                    <SheetClose asChild>
+                                        <Button variant="outline">Cancelar</Button>
+                                    </SheetClose>
+                                    <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700">Salvar Alterações</Button>
+                                </SheetFooter>
+                            </SheetContent>
+                        </Sheet>
+
                         <Button className="gap-2 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                             <CheckCircle className="h-4 w-4" />
                             Finalizar Caso
@@ -158,17 +302,12 @@ export default function CaseDetailsPage() {
                         {/* Informações Gerais */}
                         <Card className="overflow-hidden shadow-sm border-muted/40">
                             <CardHeader className="border-b bg-muted/10 px-6 py-4">
-                                <CardTitle className="text-lg font-bold">Informações Operacionais</CardTitle>
+                                <CardTitle className="text-lg font-bold">Informações Gerais</CardTitle>
                             </CardHeader>
                             <CardContent className="p-6">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <InfoItem label="Empresa/Cliente" value={caseData.client} />
-                                    <InfoItem label="Fornecedor" value={caseData.supplier} />
-                                    <InfoItem label="ID Fiscal" value={caseData.fiscalId} />
-
-                                    <InfoItem label="Data Lançamento" value={caseData.openedAt} />
-                                    <InfoItem label="Data Vencimento" value={caseData.dueDate} />
-                                    <InfoItem label="Data Pagamento" value={caseData.paymentMethod} />
+                                    <InfoItem label="Cliente" value={caseData.client} />
+                                    <InfoItem label="Data" value={caseData.openedAt} />
 
                                     <InfoItem
                                         label="Prioridade"
@@ -185,8 +324,24 @@ export default function CaseDetailsPage() {
                                             </div>
                                         }
                                     />
+
                                     <InfoItem label="Responsável" value={caseData.responsible} />
-                                    <InfoItem label="Exercício" value={caseData.period} />
+                                    <InfoItem label="Período Fiscal" value={caseData.period} />
+                                    <InfoItem label="Última Atualização" value={caseData.lastUpdate} />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Detalhes Financeiros (Collapsed/Smaller if needed but keeping structure) */}
+                        <Card className="overflow-hidden shadow-sm border-muted/40">
+                            <CardHeader className="border-b bg-muted/10 px-6 py-4">
+                                <CardTitle className="text-lg font-bold">Detalhes Financeiros</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                    <InfoItem label="Montante Bruto" value={String(caseData.value || "-")} />
+                                    <InfoItem label="Valor Líquido" value={String(caseData.netValue || "-")} />
+                                    <InfoItem label="Forma de Pagamento" value={caseData.paymentMethod} />
                                 </div>
                             </CardContent>
                         </Card>
@@ -257,36 +412,46 @@ export default function CaseDetailsPage() {
                                     <MessageSquare className="h-5 w-5 text-primary" />
                                     <CardTitle className="text-lg font-bold">Notas e Comentários</CardTitle>
                                 </div>
-                                <span className="bg-muted px-2 py-0.5 rounded text-xs font-bold text-muted-foreground">3</span>
+                                <span className="bg-muted px-2 py-0.5 rounded text-xs font-bold text-muted-foreground">{caseComments.length}</span>
                             </CardHeader>
                             <CardContent className="flex-1 overflow-y-auto p-5 space-y-6">
-                                <Comment
-                                    name="Maria Oliveira"
-                                    time="10:45"
-                                    avatarSeed="Maria"
-                                    text="Favor verificar a nota fiscal de serviço na linha 45. Parece haver uma divergência de alíquota."
-                                />
-                                <Comment
-                                    name="João Silva"
-                                    time="11:20"
-                                    avatarSeed="Joao"
-                                    text="Analisado. O fornecedor emitiu com retenção indevida. Já entrei em contato para substituição."
-                                    isReply
-                                />
-                                <Comment
-                                    name="Maria Oliveira"
-                                    time="12:00"
-                                    avatarSeed="Maria"
-                                    text="Ótimo! Aguardo a nova nota para fechar a conciliação."
-                                />
+                                {caseComments.length === 0 ? (
+                                    <div className="text-center text-muted-foreground text-sm py-10 opacity-60">
+                                        Nenhum comentário ainda.
+                                    </div>
+                                ) : (
+                                    caseComments.map((comment) => (
+                                        <Comment
+                                            key={comment.id}
+                                            name={comment.user}
+                                            time={comment.timestamp}
+                                            avatarSeed={comment.avatarSeed}
+                                            text={comment.text}
+                                            isReply={comment.isReply}
+                                        />
+                                    ))
+                                )}
                             </CardContent>
                             <div className="p-4 border-t bg-muted/30">
                                 <div className="relative">
                                     <Textarea
                                         placeholder="Escreva um comentário..."
                                         className="resize-none min-h-[100px] pr-12 text-sm bg-background"
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handlePostComment();
+                                            }
+                                        }}
                                     />
-                                    <Button size="icon" className="absolute bottom-3 right-3 h-8 w-8 bg-blue-600 hover:bg-blue-700">
+                                    <Button
+                                        size="icon"
+                                        className="absolute bottom-3 right-3 h-8 w-8 bg-blue-600 hover:bg-blue-700"
+                                        onClick={handlePostComment}
+                                        disabled={!newComment.trim()}
+                                    >
                                         <Send className="h-4 w-4" />
                                     </Button>
                                 </div>

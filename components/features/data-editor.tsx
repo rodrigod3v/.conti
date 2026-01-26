@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import {
     Table,
@@ -141,6 +141,29 @@ const ObservationCell = ({ value, globalIndex, header, updateCell }: { value: st
 export function DataEditor() {
     const { fileData, headers, fileName, updateCell, setFileData } = useAppStore();
     const [isSaving, setIsSaving] = useState(false);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const container = tableContainerRef.current;
+        if (!container) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            // Find the actual scrollable element (shadcn Table wrapper)
+            const scrollTarget = container.querySelector('[data-slot="table-container"]') || container;
+
+            if (e.deltaY !== 0) {
+                // If scrolling vertically, convert to horizontal for the table
+                e.preventDefault();
+                scrollTarget.scrollLeft += e.deltaY;
+            }
+        };
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
+
+        return () => {
+            container.removeEventListener('wheel', handleWheel);
+        };
+    }, []);
 
     // Local state for UI
     const [searchTerm, setSearchTerm] = useState("");
@@ -506,7 +529,10 @@ export function DataEditor() {
 
             {/* Table Section */}
             <div className="rounded-lg border bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
-                <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                <div
+                    ref={tableContainerRef}
+                    className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+                >
                     <Table>
                         <TableHeader className="bg-gray-50/95 sticky top-0 z-20 shadow-sm backdrop-blur-sm">
                             <TableRow className="hover:bg-transparent border-b border-gray-200">
@@ -581,7 +607,7 @@ export function DataEditor() {
                                                     {String(row["Status"]).toLowerCase() === "aprovado" ? (
                                                         <Check className="h-4 w-4 text-emerald-600" />
                                                     ) : (
-                                                        <Link href={`/cases/${row["Caso"]}`}>
+                                                        <Link href={`/cases/${row["Chamado"] || row["chamado"] || row["Caso"] || row["caso"]}`}>
                                                             <Pencil className="h-4 w-4 text-muted-foreground cursor-pointer hover:text-teal-600" />
                                                         </Link>
                                                     )}

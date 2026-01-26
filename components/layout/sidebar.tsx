@@ -49,14 +49,11 @@ export function Sidebar() {
     return (
         <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card transition-transform">
             <div className="flex h-full flex-col px-3 py-4">
-                <div className="mb-10 flex items-center pl-2.5">
-                    <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500 text-white">
-                        <FolderOpen className="h-6 w-6" />
+                <div className="mb-10 flex items-center pl-4 pt-2">
+                    <div className="logo-text flex items-baseline text-2xl font-extrabold">
+                        <span className="text-action-orange">.</span>
+                        <span className="text-deep-blue dark:text-white">conti</span>
                     </div>
-                    <span className="self-center whitespace-nowrap text-xl font-semibold text-foreground">
-                        Contábil Gestão
-                        <span className="block text-xs font-normal text-muted-foreground">Plano Profissional</span>
-                    </span>
                 </div>
 
                 <ul className="space-y-2 font-medium">

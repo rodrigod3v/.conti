@@ -52,6 +52,10 @@
   --color-background-dark: #0f172a;
 }
 
+.logo-text {
+  letter-spacing: -0.05em;
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
