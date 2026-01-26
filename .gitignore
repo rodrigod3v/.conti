@@ -47,3 +47,20 @@ next-env.d.ts
 *.db-journal
 *.db-wal
 
+
+# exported data
+*_editado.xlsx
+dados_exportados.xlsx
+
+# os
+Thumbs.db
+
+# editor
+.vscode
+.idea
+*.swp
+project.zip
+
+# security
+*.key
+*.pub
