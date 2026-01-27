@@ -100,7 +100,7 @@ export function RecentHistory() {
 
     return (
         <div className="rounded-2xl border bg-white shadow-sm dark:bg-card">
-            <div className="flex items-center justify-between border-b px-6 py-4">
+            <div className="flex items-center justify-between border-b px-4 py-3">
                 <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold text-foreground">Histórico Recente</h2>
                 </div>
@@ -119,10 +119,10 @@ export function RecentHistory() {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                         <tr>
-                            <th className="px-6 py-3 font-medium">Nome do Arquivo</th>
-                            <th className="px-6 py-3 font-medium">Data de Envio</th>
-                            <th className="px-6 py-3 font-medium">Status</th>
-                            <th className="px-6 py-3 font-medium text-right">Ação</th>
+                            <th className="px-4 py-2 font-medium">Nome do Arquivo</th>
+                            <th className="px-4 py-2 font-medium">Data de Envio</th>
+                            <th className="px-4 py-2 font-medium">Status</th>
+                            <th className="px-4 py-2 font-medium text-right">Ação</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -135,7 +135,7 @@ export function RecentHistory() {
                         ) : (
                             displayedFiles.map((file) => ( // Used displayedFiles
                                 <tr key={file.id} className="group hover:bg-muted/20">
-                                    <td className="whitespace-nowrap px-6 py-4">
+                                    <td className="whitespace-nowrap px-4 py-2">
                                         <div className="flex items-center gap-3">
                                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
                                                 <FileSpreadsheet className="h-5 w-5" />
@@ -146,10 +146,10 @@ export function RecentHistory() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="whitespace-nowrap px-6 py-4 text-muted-foreground">
+                                    <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
                                         {formatDate(file.updatedAt || file.createdAt)} {/* Used updatedAt */}
                                     </td>
-                                    <td className="whitespace-nowrap px-6 py-4">
+                                    <td className="whitespace-nowrap px-4 py-2">
                                         <Badge
                                             variant="outline"
                                             className={`
@@ -161,7 +161,7 @@ export function RecentHistory() {
                                             {statusMap[file.status] || file.status}
                                         </Badge>
                                     </td>
-                                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                                    <td className="whitespace-nowrap px-4 py-2 text-right">
                                         <Button
                                             variant="ghost"
                                             className="font-medium text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"

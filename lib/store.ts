@@ -22,6 +22,8 @@ interface AppState {
   updateCell: (rowIndex: number, column: string, value: string | number) => void;
   addComment: (caseId: string, text: string, user: string) => void;
   clearData: () => void;
+  isSidebarOpen: boolean;
+  toggleSidebar: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -58,4 +60,6 @@ export const useAppStore = create<AppState>((set) => ({
       return { comments: newComments };
     }),
   clearData: () => set({ fileData: [], headers: [], fileName: null, comments: {} }),
+  isSidebarOpen: true,
+  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 }));

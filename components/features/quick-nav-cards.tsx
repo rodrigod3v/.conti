@@ -34,19 +34,19 @@ const cards = [
 
 export function QuickNavCards() {
     return (
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
             {cards.map((card) => (
                 <Link
                     key={card.title}
                     href={card.href}
                     className={cn(
-                        "group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-white p-6 transition-all hover:shadow-lg dark:bg-card",
+                        "group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-white p-4 transition-all hover:shadow-lg dark:bg-card",
                         card.border
                     )}
                 >
                     <div>
-                        <div className={cn("mb-4 flex h-12 w-12 items-center justify-center rounded-xl", card.bg, card.color)}>
-                            <card.icon className="h-6 w-6" />
+                        <div className={cn("mb-3 flex h-10 w-10 items-center justify-center rounded-xl", card.bg, card.color)}>
+                            <card.icon className="h-5 w-5" />
                         </div>
                         <h3 className="mb-2 text-lg font-bold text-foreground">{card.title}</h3>
                         <p className="text-sm leading-relaxed text-muted-foreground">{card.description}</p>

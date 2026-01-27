@@ -14,13 +14,13 @@ import {
 
 export default function DashboardPage() {
     return (
-        <div className="space-y-8">
+        <div className="space-y-4">
             {/* Header */}
-            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+            <div className="flex flex-col justify-between gap-2 md:flex-row md:items-start">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard Contábil</h1>
-                    <p className="text-lg text-muted-foreground">
-                        Visão geral de desempenho e pendências da equipe.
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard Contábil</h1>
+                    <p className="text-sm text-muted-foreground">
+                        Visão geral de desempenho e pendências.
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

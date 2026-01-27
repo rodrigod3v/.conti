@@ -24,23 +24,31 @@ import {
     Info,
     Smile,
     AtSign,
-    Save
+    Save,
+    Calendar as CalendarIcon,
+    Wallet,
+    Briefcase,
+    FileText as FileTextIcon,
+    AlignLeft,
+
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-    SheetFooter,
-    SheetClose
-} from "@/components/ui/sheet";
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+import { Calendar } from "@/components/ui/calendar";
+
 
 import { useAppStore } from "@/lib/store";
 import { useMemo, useState, useEffect } from "react";
@@ -54,23 +62,22 @@ export default function CaseDetailsPage() {
     // Comment State
     const [newComment, setNewComment] = useState("");
 
-    // Edit State
-    const [editForm, setEditForm] = useState({
-        status: "",
-        responsible: "",
-        dueDate: "",
-        description: "",
-        descriptionField: ""
-    });
+    // Edit State - Dynamic form for all fields
+    const [editForm, setEditForm] = useState<Record<string, string>>({});
+    const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+
 
     const caseData = useMemo(() => {
         // Helper to get value case-insensitively
         const getValue = (r: any, ...keys: string[]) => {
             for (const key of keys) {
+                // Exact match first
                 if (r[key] !== undefined) return r[key];
-                // Try case insensitive search
-                const lowerKey = key.toLowerCase();
-                const foundKey = Object.keys(r).find(k => k.toLowerCase() === lowerKey);
+
+                // Try case insensitive and trimmed match
+                const normalizedSearch = key.trim().toLowerCase();
+                const foundKey = Object.keys(r).find(k => k.trim().toLowerCase() === normalizedSearch);
+
                 if (foundKey && r[foundKey] !== undefined) return r[foundKey];
             }
             return null;
@@ -87,6 +94,35 @@ export default function CaseDetailsPage() {
         const status = String(getValue(row, "Status", "status") || "Pendente");
         const descriptionField = ["Inconsistencias", "inconsistencias", "Descrição", "descricao", "Observações", "observacoes"].find(k => row[k] !== undefined) || "Inconsistencias";
 
+        // Dynamic Fields (Leftover)
+        const knownKeys = [
+            "Caso", "Chamado", "caso", "chamado",
+            "Inconsistencias", "inconsistencias", "Descrição", "descricao", "Observações", "observacoes",
+            "Status", "status",
+            "Empresa", "empresa", "Cliente", "cliente", "Nome do Fornecedor", "Fornecedor",
+            "Responsável", "responsavel", "Usuario", "usuario", "Area Responsavel",
+            "Exercicio", "exercicio", "Periodo", "periodo",
+            "Data", "data", "Data Abertura",
+            "Data Vencimento", "vencimento",
+            "Valor (R$)", "Valor", "montante",
+            "Valor Liquido", "valor liquido",
+            "Forma de Pagamento", "forma pagamento", "Forma Pagto", "Metodo Pagamento", "FORMA DE PGTO",
+            "PCC", "pcc", "PCC", "pcc",
+            "IR", "ir", "IRRF", "Imposto de Renda",
+            "Base ISS", "base iss"
+        ];
+
+        const otherFields: { label: string, value: string }[] = [];
+        Object.keys(row).forEach(key => {
+            const normalizedKey = key.trim().toLowerCase();
+            if (!knownKeys.some(k => k.trim().toLowerCase() === normalizedKey)) {
+                const val = row[key];
+                if (val !== undefined && val !== null && String(val).trim() !== "") {
+                    otherFields.push({ label: key, value: String(val) });
+                }
+            }
+        });
+
         return {
             rowIndex,
             id: String(getValue(row, "Caso", "Chamado", "caso", "chamado") || caseId),
@@ -102,47 +138,95 @@ export default function CaseDetailsPage() {
             responsible: String(getValue(row, "Responsável", "responsavel", "Usuario", "usuario", "Area Responsavel") || "Não atribuído"),
             priority: status.toLowerCase() === "erro" || status.toLowerCase() === "alto" ? "Alta" : "Normal",
             period: getValue(row, "Exercicio", "exercicio", "Periodo", "periodo") ? `Exercício ${getValue(row, "Exercicio", "exercicio")}` : "2023",
-            lastUpdate: "Há 2 horas", // Mock for now as spreadsheet usually doesn't have this
+            lastUpdate: "Há 2 horas", // Mock
 
             // Dates
             openedAt: String(getValue(row, "Data", "data", "Data Abertura") || "-"),
             dueDate: String(getValue(row, "Data Vencimento", "vencimento") || "-"),
 
-            // Financial (Keep existing logic but safe access)
+            // Financial
             value: getValue(row, "Valor (R$)", "Valor", "montante"),
             netValue: getValue(row, "Valor Liquido", "valor liquido"),
-            paymentMethod: String(getValue(row, "Forma de Pagamento", "forma pagamento") || "-"),
+            paymentMethod: String(getValue(row, "Forma de Pagamento", "forma pagamento", "Forma Pagto", "Metodo Pagamento") || "-"),
             pcc: getValue(row, "PCC", "pcc"),
-            ir: getValue(row, "IR", "ir"),
+            ir: getValue(row, "IR", "ir", "IRRF", "Imposto de Renda"),
             issBase: getValue(row, "Base ISS", "base iss"),
+
+            otherFields,
+            // DEBUG: Return raw row keys for finding the correct column names
+            debugKeys: Object.keys(row).sort()
         };
     }, [caseId, fileData]);
 
-    // Initialize edit form when caseData loads
-    useEffect(() => {
-        if (caseData) {
-            setEditForm({
-                status: caseData.status,
-                responsible: caseData.responsible,
-                dueDate: caseData.dueDate,
-                description: caseData.description,
-                descriptionField: caseData.descriptionField
+    // Calculate unique values for ALL columns
+    const uniqueOptions = useMemo(() => {
+        if (!fileData || fileData.length === 0) return {};
+
+        const optionsMap: Record<string, Set<string>> = {};
+
+        fileData.forEach(row => {
+            Object.keys(row).forEach(key => {
+                if (!optionsMap[key]) {
+                    optionsMap[key] = new Set<string>();
+                }
+                const val = row[key];
+                if (val !== undefined && val !== null && String(val).trim() !== "") {
+                    optionsMap[key].add(String(val));
+                }
             });
+        });
+
+        // Convert to arrays and sort
+        const result: Record<string, string[]> = {};
+        Object.keys(optionsMap).forEach(key => {
+            result[key] = Array.from(optionsMap[key]).sort();
+        });
+
+        return result;
+    }, [fileData]);
+
+    // Initialize edit form when caseData loads - populate with entire row
+    useEffect(() => {
+        if (caseData && fileData[caseData.rowIndex]) {
+            const row = fileData[caseData.rowIndex];
+            const formData: Record<string, string> = {};
+            Object.keys(row).forEach(key => {
+                formData[key] = String(row[key] || "");
+            });
+            setEditForm(formData);
         }
-    }, [caseData]);
+    }, [caseData, fileData]);
 
     const handleSaveEdit = () => {
         if (!caseData) return;
 
-        // Update Store
-        updateCell(caseData.rowIndex, "Status", editForm.status);
-        updateCell(caseData.rowIndex, "Responsável", editForm.responsible);
-        updateCell(caseData.rowIndex, "Data Vencimento", editForm.dueDate);
-        if (editForm.descriptionField) {
-            updateCell(caseData.rowIndex, editForm.descriptionField, editForm.description);
-        }
+        // Update all fields in the store
+        Object.keys(editForm).forEach(key => {
+            updateCell(caseData.rowIndex, key, editForm[key]);
+        });
 
         setIsEditOpen(false);
+    };
+
+    const formatCurrency = (value: string) => {
+        if (!value) return "";
+        // Remove non-numeric except comma/dot
+        const clean = value.replace(/[^\d,\.]/g, "");
+        if (!clean) return "";
+
+        // Try to parse standard JS float
+        const dotValue = clean.replace(",", ".");
+        const floatVal = parseFloat(dotValue);
+
+        if (isNaN(floatVal)) return value;
+
+        // Format to BRL style
+        return floatVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const handleCurrencyBlur = (key: string, value: string) => {
+        const formatted = formatCurrency(value);
+        setEditForm(prev => ({ ...prev, [key]: formatted }));
     };
 
     const handlePostComment = () => {
@@ -178,10 +262,10 @@ export default function CaseDetailsPage() {
                 </div>
 
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b pb-8">
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <h1 className="text-3xl font-black tracking-tight text-foreground">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4">
+                    <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h1 className="text-2xl font-black tracking-tight text-foreground">
                                 Caso #{caseData.id}: {caseData.title}
                             </h1>
                             <Badge className={cn(
@@ -196,78 +280,295 @@ export default function CaseDetailsPage() {
                                 {caseData.status}
                             </Badge>
                         </div>
-                        <p className="text-muted-foreground text-lg">
+                        <p className="text-muted-foreground text-sm">
                             {caseData.description}
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
-                            <SheetTrigger asChild>
+                        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                            <DialogTrigger asChild>
                                 <Button variant="outline" className="gap-2 font-bold">
                                     <Edit className="h-4 w-4" />
                                     Editar Caso
                                 </Button>
-                            </SheetTrigger>
-                            <SheetContent>
-                                <SheetHeader>
-                                    <SheetTitle>Editar Caso #{caseData.id}</SheetTitle>
-                                    <SheetDescription>
-                                        Faça alterações nas informações principais do caso.
-                                    </SheetDescription>
-                                </SheetHeader>
-                                <div className="grid gap-4 py-4">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="status">Status</Label>
-                                        <Select
-                                            value={editForm.status}
-                                            onValueChange={(val) => setEditForm({ ...editForm, status: val })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Selecione o status" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Pendente">Pendente</SelectItem>
-                                                <SelectItem value="Em Análise">Em Análise</SelectItem>
-                                                <SelectItem value="Aprovado">Aprovado</SelectItem>
-                                                <SelectItem value="Erro">Erro</SelectItem>
-                                                <SelectItem value="Cancelado">Cancelado</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                            </DialogTrigger>
+                            <DialogContent className="w-full max-w-[95vw] lg:max-w-7xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
+                                <DialogHeader className="px-6 py-5 border-b flex flex-row items-center justify-between shrink-0">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-8 w-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                                            <Edit className="h-4 w-4 text-orange-600" />
+                                        </div>
+                                        <div>
+                                            <DialogTitle className="text-lg font-bold">Editar Caso #{caseData.id}</DialogTitle>
+                                            <DialogDescription className="text-xs text-muted-foreground">
+                                                Atualize as informações do caso abaixo.
+                                            </DialogDescription>
+                                        </div>
                                     </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="responsible">Responsável</Label>
-                                        <Input
-                                            id="responsible"
-                                            value={editForm.responsible}
-                                            onChange={(e) => setEditForm({ ...editForm, responsible: e.target.value })}
-                                        />
+                                </DialogHeader>
+                                <div className="flex-1 overflow-y-auto px-6 py-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {/* Left Column: Basic Info */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                                                <Briefcase className="h-4 w-4 text-blue-600" />
+                                                <h3 className="font-bold text-sm text-gray-900">Cliente e Responsável</h3>
+                                            </div>
+
+                                            {/* Client */}
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Cliente / Empresa</Label>
+                                                <Input
+                                                    value={editForm["Empresa"] || editForm["Cliente"] || ""}
+                                                    onChange={(e) => {
+                                                        const key = Object.keys(editForm).find(k => k.toLowerCase().includes("empresa") || k.toLowerCase().includes("cliente"));
+                                                        if (key) setEditForm({ ...editForm, [key]: e.target.value });
+                                                    }}
+                                                    className="border-gray-300"
+                                                />
+                                            </div>
+
+                                            {/* Responsible */}
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Responsável</Label>
+                                                <Select
+                                                    value={editForm["Responsável"] || editForm["Usuario"] || ""}
+                                                    onValueChange={(val) => {
+                                                        const key = Object.keys(editForm).find(k => k.toLowerCase().includes("respons") || k.toLowerCase().includes("usuario"));
+                                                        if (key) setEditForm({ ...editForm, [key]: val });
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="border-gray-300">
+                                                        <SelectValue placeholder="Selecione o responsável" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {(uniqueOptions["Responsável"] || uniqueOptions["Usuario"] || []).map((opt) => (
+                                                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="dueDate">Data de Vencimento</Label>
-                                        <Input
-                                            id="dueDate"
-                                            value={editForm.dueDate}
-                                            onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="description">Descrição/Observação</Label>
-                                        <Textarea
-                                            id="description"
-                                            value={editForm.description}
-                                            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                            className="min-h-[100px]"
-                                        />
+
+                                    {/* Middle Column: Extra/Dynamic Fields */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                                            <AlignLeft className="h-4 w-4 text-orange-600" />
+                                            <h3 className="font-bold text-sm text-gray-900">Detalhes do Caso</h3>
+                                        </div>
+
+                                        {/* Title */}
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold text-gray-600 uppercase">Título / Descrição</Label>
+                                            <Input
+                                                value={editForm["Inconsistencias"] || editForm["Descrição"] || ""}
+                                                onChange={(e) => {
+                                                    const key = Object.keys(editForm).find(k => k.toLowerCase().includes("inconsist") || k.toLowerCase().includes("descri"));
+                                                    if (key) setEditForm({ ...editForm, [key]: e.target.value });
+                                                }}
+                                                className="border-gray-300"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {/* Date Inputs */}
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Data Abertura</Label>
+                                                <Input
+                                                    value={editForm["Data"] || editForm["Data Abertura"] || ""}
+                                                    onChange={(e) => {
+                                                        const key = Object.keys(editForm).find(k => k.toLowerCase() === "data" || k.toLowerCase() === "data abertura");
+                                                        if (key) setEditForm({ ...editForm, [key]: e.target.value });
+                                                    }}
+                                                    className="border-gray-300"
+                                                    placeholder="DD/MM/AAAA"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Vencimento</Label>
+                                                <Input
+                                                    value={editForm["Data Vencimento"] || editForm["vencimento"] || ""}
+                                                    onChange={(e) => {
+                                                        const key = Object.keys(editForm).find(k => k.toLowerCase().includes("vencimento"));
+                                                        if (key) setEditForm({ ...editForm, [key]: e.target.value });
+                                                    }}
+                                                    className="border-gray-300"
+                                                    placeholder="DD/MM/AAAA"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 mt-2 border-t border-gray-100">
+                                            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">
+                                                Outros Campos
+                                            </Label>
+
+                                            <div className="grid grid-cols-2 gap-4 pr-2">
+                                                {Object.keys(editForm)
+                                                    .filter(key => {
+                                                        const lower = key.toLowerCase();
+                                                        return !lower.includes("inconsist") && !lower.includes("descri") &&
+                                                            !lower.includes("empresa") && !lower.includes("cliente") &&
+                                                            !lower.includes("valor") && !lower.includes("vencimento") &&
+                                                            !lower.includes("respons") && !lower.includes("usuario") &&
+                                                            !lower.includes("status") && !lower.includes("observ") &&
+                                                            !lower.includes("notas");
+                                                    })
+                                                    .sort()
+                                                    .map((key) => {
+                                                        const options = uniqueOptions[key] || [];
+                                                        const useDropdown = options.length > 1 && options.length < 20;
+                                                        const currentValue = editForm[key] || "";
+
+                                                        return (
+                                                            <div key={key} className="space-y-2">
+                                                                <Label className="text-xs font-semibold text-gray-600 uppercase">{key}</Label>
+                                                                {useDropdown ? (
+                                                                    <Select
+                                                                        value={currentValue}
+                                                                        onValueChange={(val) => setEditForm({ ...editForm, [key]: val })}
+                                                                    >
+                                                                        <SelectTrigger className="border-gray-300">
+                                                                            <SelectValue placeholder={`Selecione ${key}`} />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            {options.map((opt) => (
+                                                                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                ) : (
+                                                                    <Input
+                                                                        value={currentValue}
+                                                                        onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                                                                        className="border-gray-300"
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                {/* Empty state if no extra fields */}
+                                                {Object.keys(editForm).filter(key => {
+                                                    const lower = key.toLowerCase();
+                                                    return !lower.includes("inconsist") && !lower.includes("descri") &&
+                                                        !lower.includes("empresa") && !lower.includes("cliente") &&
+                                                        !lower.includes("valor") && !lower.includes("vencimento") &&
+                                                        !lower.includes("respons") && !lower.includes("usuario") &&
+                                                        !lower.includes("status") && !lower.includes("observ") &&
+                                                        !lower.includes("notas");
+                                                }).length === 0 && (
+                                                        <div className="text-sm text-gray-500 italic py-4">Nenhum campo adicional disponível.</div>
+                                                    )}
+                                            </div>
+                                        </div>
+
+                                        {/* Right Column: Status & Management */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                                                <Wallet className="h-4 w-4 text-emerald-600" />
+                                                <h3 className="font-bold text-sm text-gray-900">Financeiro e Outros</h3>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Valor (R$)</Label>
+                                                    <Input
+                                                        value={editForm["Valor (R$)"] || editForm["Valor"] || ""}
+                                                        onChange={(e) => {
+                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("valor") && !k.toLowerCase().includes("liquido"));
+                                                            if (key) setEditForm({ ...editForm, [key]: e.target.value });
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("valor") && !k.toLowerCase().includes("liquido"));
+                                                            if (key) handleCurrencyBlur(key, e.target.value);
+                                                        }}
+                                                        className="border-gray-300 font-mono"
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Valor Líquido</Label>
+                                                    <Input
+                                                        value={editForm["Valor Liquido"] || editForm["valor liquido"] || ""}
+                                                        onChange={(e) => {
+                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("liquido"));
+                                                            if (key) setEditForm({ ...editForm, [key]: e.target.value });
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("liquido"));
+                                                            if (key) handleCurrencyBlur(key, e.target.value);
+                                                        }}
+                                                        className="border-gray-300 font-mono"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Status Dropdown */}
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Status</Label>
+                                                <Select
+                                                    value={editForm["Status"] || editForm["status"] || ""}
+                                                    onValueChange={(val) => {
+                                                        const key = Object.keys(editForm).find(k => k.toLowerCase() === "status");
+                                                        if (key) setEditForm({ ...editForm, [key]: val });
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="border-gray-300 bg-gray-50/50">
+                                                        <SelectValue placeholder="Selecione o status" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {(uniqueOptions["Status"] || uniqueOptions["status"] || ["Pendente", "Em Andamento", "Concluído"]).map((opt) => (
+                                                            <SelectItem key={opt} value={opt}>
+                                                                <span className={cn(
+                                                                    "font-medium",
+                                                                    opt.toLowerCase() === "pendente" && "text-amber-600",
+                                                                    opt.toLowerCase() === "erro" && "text-red-600",
+                                                                    (opt.toLowerCase() === "concluído" || opt.toLowerCase() === "resolvido" || opt.toLowerCase() === "ok") && "text-emerald-600"
+                                                                )}>
+                                                                    {opt}
+                                                                </span>
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            {/* Quick Notes */}
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Notas Rápidas</Label>
+                                                <Textarea
+                                                    value={editForm["Observações"] || editForm["Notas"] || ""}
+                                                    onChange={(e) => {
+                                                        const key = Object.keys(editForm).find(k => k.toLowerCase().includes("observ") || k.toLowerCase().includes("notas"));
+                                                        if (key) setEditForm({ ...editForm, [key]: e.target.value });
+                                                    }}
+                                                    placeholder="Adicione uma observação rápida..."
+                                                    className="min-h-[120px] border-gray-300 resize-none"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <SheetFooter>
-                                    <SheetClose asChild>
-                                        <Button variant="outline">Cancelar</Button>
-                                    </SheetClose>
-                                    <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700">Salvar Alterações</Button>
-                                </SheetFooter>
-                            </SheetContent>
-                        </Sheet>
+                                <DialogFooter className="px-6 py-4 border-t bg-gray-50 gap-3 shrink-0">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 sm:flex-none border-gray-300"
+                                        onClick={() => setIsEditOpen(false)}
+                                    >
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        onClick={handleSaveEdit}
+                                        className="bg-orange-600 hover:bg-orange-700 text-white flex-1 sm:flex-none shadow-sm"
+                                    >
+                                        <Save className="h-4 w-4 mr-2" />
+                                        Salvar Alterações
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
 
                         <Button className="gap-2 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                             <CheckCircle className="h-4 w-4" />
@@ -276,15 +577,15 @@ export default function CaseDetailsPage() {
                     </div>
                 </div>
 
-                <div className="flex flex-col lg:flex-row gap-8 mt-8">
+                <div className="flex flex-col lg:flex-row gap-6 mt-6">
                     {/* Main Content */}
                     <div className="flex-1 space-y-8">
                         {/* Financeiro */}
                         <Card className="overflow-hidden shadow-sm border-muted/40">
-                            <CardHeader className="border-b bg-muted/10 px-6 py-4">
-                                <CardTitle className="text-lg font-bold">Detalhes Financeiros</CardTitle>
+                            <CardHeader className="border-b bg-muted/10 px-4 py-3">
+                                <CardTitle className="text-base font-bold">Detalhes Financeiros</CardTitle>
                             </CardHeader>
-                            <CardContent className="p-6">
+                            <CardContent className="p-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                     <InfoItem label="Montante Bruto" value={String(caseData.value)} />
                                     <InfoItem label="Valor Líquido" value={String(caseData.netValue || "-")} />
@@ -301,10 +602,10 @@ export default function CaseDetailsPage() {
 
                         {/* Informações Gerais */}
                         <Card className="overflow-hidden shadow-sm border-muted/40">
-                            <CardHeader className="border-b bg-muted/10 px-6 py-4">
-                                <CardTitle className="text-lg font-bold">Informações Gerais</CardTitle>
+                            <CardHeader className="border-b bg-muted/10 px-4 py-3">
+                                <CardTitle className="text-base font-bold">Informações Gerais</CardTitle>
                             </CardHeader>
-                            <CardContent className="p-6">
+                            <CardContent className="p-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     <InfoItem label="Cliente" value={caseData.client} />
                                     <InfoItem label="Data" value={caseData.openedAt} />
@@ -334,10 +635,10 @@ export default function CaseDetailsPage() {
 
                         {/* Detalhes Financeiros (Collapsed/Smaller if needed but keeping structure) */}
                         <Card className="overflow-hidden shadow-sm border-muted/40">
-                            <CardHeader className="border-b bg-muted/10 px-6 py-4">
-                                <CardTitle className="text-lg font-bold">Detalhes Financeiros</CardTitle>
+                            <CardHeader className="border-b bg-muted/10 px-4 py-3">
+                                <CardTitle className="text-base font-bold">Detalhes Financeiros</CardTitle>
                             </CardHeader>
-                            <CardContent className="p-6">
+                            <CardContent className="p-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                     <InfoItem label="Montante Bruto" value={String(caseData.value || "-")} />
                                     <InfoItem label="Valor Líquido" value={String(caseData.netValue || "-")} />
@@ -346,41 +647,28 @@ export default function CaseDetailsPage() {
                             </CardContent>
                         </Card>
 
-                        {/* Histórico de Atividades */}
-                        <Card className="overflow-hidden shadow-sm border-muted/40">
-                            <CardHeader className="border-b bg-muted/10 px-6 py-4">
-                                <CardTitle className="text-lg font-bold">Histórico de Atividades</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-6">
-                                <div className="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-600 before:via-blue-300 before:to-transparent md:before:mx-auto md:before:translate-x-0">
-                                    <TimelineItem
-                                        icon={<History className="h-4 w-4" />}
-                                        title="Status Alterado"
-                                        time="Hoje, 14:30"
-                                        content={<span>João Silva alterou o status para <span className="font-bold text-amber-600">Em Revisão</span>.</span>}
-                                        isActive
-                                    />
-                                    <TimelineItem
-                                        icon={<Paperclip className="h-4 w-4" />}
-                                        title="Arquivo Anexado"
-                                        time="Ontem, 09:15"
-                                        content={<span>Maria Oliveira anexou a <span className="text-primary font-medium">Planilha de impostos</span> consolidada.</span>}
-                                        isRight
-                                    />
-                                    <TimelineItem
-                                        icon={<Plus className="h-4 w-4" />}
-                                        title="Caso Criado"
-                                        time="12/10/2023"
-                                        content="O caso foi aberto automaticamente pelo sistema de importação."
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
+                        {/* Other Dynamic Fields */}
+                        {caseData.otherFields && caseData.otherFields.length > 0 && (
+                            <Card className="overflow-hidden shadow-sm border-muted/40">
+                                <CardHeader className="border-b bg-muted/10 px-4 py-3">
+                                    <CardTitle className="text-base font-bold">Outros Detalhes</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {caseData.otherFields.map((field, idx) => (
+                                            <InfoItem key={idx} label={field.label} value={field.value} />
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+
 
                         {/* Documentos Relacionados */}
                         <Card className="overflow-hidden shadow-sm border-muted/40">
-                            <CardHeader className="border-b bg-muted/10 px-6 py-4 flex flex-row items-center justify-between">
-                                <CardTitle className="text-lg font-bold">Documentos Relacionados</CardTitle>
+                            <CardHeader className="border-b bg-muted/10 px-4 py-3 flex flex-row items-center justify-between">
+                                <CardTitle className="text-base font-bold">Documentos Relacionados</CardTitle>
                                 <Button variant="ghost" size="sm" className="text-primary font-bold hover:text-primary hover:bg-primary/10 gap-1">
                                     <Plus className="h-4 w-4" />
                                     Adicionar
@@ -406,15 +694,15 @@ export default function CaseDetailsPage() {
                     {/* Sidebar */}
                     <div className="w-full lg:w-96 space-y-6">
                         {/* Comments */}
-                        <Card className="shadow-sm border-muted/40 flex flex-col h-[600px]">
-                            <CardHeader className="border-b bg-muted/10 px-6 py-4 flex flex-row items-center justify-between space-y-0">
+                        <Card className="shadow-sm border-muted/40 flex flex-col h-[500px]">
+                            <CardHeader className="border-b bg-muted/10 px-4 py-3 flex flex-row items-center justify-between space-y-0">
                                 <div className="flex items-center gap-2">
-                                    <MessageSquare className="h-5 w-5 text-primary" />
-                                    <CardTitle className="text-lg font-bold">Notas e Comentários</CardTitle>
+                                    <MessageSquare className="h-4 w-4 text-primary" />
+                                    <CardTitle className="text-base font-bold">Notas e Comentários</CardTitle>
                                 </div>
                                 <span className="bg-muted px-2 py-0.5 rounded text-xs font-bold text-muted-foreground">{caseComments.length}</span>
                             </CardHeader>
-                            <CardContent className="flex-1 overflow-y-auto p-5 space-y-6">
+                            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
                                 {caseComments.length === 0 ? (
                                     <div className="text-center text-muted-foreground text-sm py-10 opacity-60">
                                         Nenhum comentário ainda.
@@ -466,27 +754,12 @@ export default function CaseDetailsPage() {
                             </div>
                         </Card>
 
-                        {/* Progress Widget */}
-                        <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl p-6 text-white shadow-lg">
-                            <h3 className="font-bold mb-3 flex items-center gap-2">
-                                <Info className="h-5 w-5" />
-                                Lembrete de Prazo
-                            </h3>
-                            <p className="text-sm text-blue-100 mb-4 opacity-90">
-                                A conciliação deve ser finalizada até o dia 20 para o fechamento mensal.
-                            </p>
-                            <div className="w-full bg-blue-900/40 rounded-full h-2 mb-2">
-                                <div className="bg-white h-2 rounded-full" style={{ width: '65%' }} />
-                            </div>
-                            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-blue-100">
-                                <span>Progresso</span>
-                                <span>65%</span>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
             </div>
         </div>
+
     );
 }
 
@@ -511,7 +784,7 @@ function TimelineItem({ icon, title, time, content, isActive, isRight }: { icon:
                 {icon}
             </div>
             <div className={cn(
-                "w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-lg border",
+                "w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-3 rounded-lg border",
                 isActive ? "bg-background shadow-sm" : "bg-muted/30 border-transparent"
             )}>
                 <div className="flex items-center justify-between space-x-2 mb-1">

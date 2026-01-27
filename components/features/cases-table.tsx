@@ -38,7 +38,7 @@ export function CasesTable() {
                             <thead className="text-xs text-muted-foreground uppercase bg-muted/30 sticky top-0 backdrop-blur-sm z-10">
                                 <tr>
                                     {headers.map((header) => (
-                                        <th key={header} className="px-4 py-3 font-medium whitespace-nowrap bg-muted/30">
+                                        <th key={header} className="px-4 py-2 font-medium whitespace-nowrap bg-muted/30">
                                             {header}
                                         </th>
                                     ))}
@@ -48,7 +48,7 @@ export function CasesTable() {
                                 {fileData.map((row, index) => (
                                     <tr key={index} className="hover:bg-muted/20">
                                         {headers.map((header) => (
-                                            <td key={`${index}-${header}`} className="px-4 py-3 whitespace-nowrap">
+                                            <td key={`${index}-${header}`} className="px-4 py-2 whitespace-nowrap">
                                                 {formatCell(row[header], header)}
                                             </td>
                                         ))}

@@ -401,12 +401,12 @@ export function DataEditor() {
     if (!fileData) return null;
 
     return (
-        <div className="h-[calc(100vh-100px)] flex flex-col gap-6">
+        <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
             {/* Header Section */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
                 <div className="space-y-1">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold tracking-tight">Editor de Dados</h1>
+                        <h1 className="text-xl font-bold tracking-tight">Editor de Dados</h1>
                         {errorCount > 0 && (
                             <div className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 ring-1 ring-inset ring-red-600/10">
                                 <AlertCircle className="h-3 w-3" />
@@ -441,21 +441,21 @@ export function DataEditor() {
             </div>
 
             {/* Filters Section */}
-            <div className="flex flex-col gap-4 rounded-lg border bg-card p-4 md:flex-row md:items-center bg-white shrink-0">
+            <div className="flex flex-col gap-3 rounded-lg border bg-card p-2 md:flex-row md:items-center bg-white shrink-0">
                 <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                         placeholder="Buscar por caso, responsável ou valor..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 border-muted-foreground/20"
+                        className="pl-9 h-9 border-muted-foreground/20"
                     />
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="h-8 w-[1px] bg-border mx-2 hidden md:block" />
 
                     <Select value={filterColumn} onValueChange={(val) => { setFilterColumn(val); setFilterValue("all"); }}>
-                        <SelectTrigger className="w-[180px] border-muted-foreground/20 h-10">
+                        <SelectTrigger className="w-[180px] border-muted-foreground/20 h-9">
                             <div className="flex items-center gap-2">
                                 <Filter className="h-4 w-4 text-muted-foreground" />
                                 <SelectValue placeholder="Filtrar por..." />
@@ -471,7 +471,7 @@ export function DataEditor() {
 
                     {filterColumn !== "all" && (
                         <Select value={filterValue} onValueChange={setFilterValue}>
-                            <SelectTrigger className="w-[180px] border-muted-foreground/20 h-10">
+                            <SelectTrigger className="w-[180px] border-muted-foreground/20 h-9">
                                 <div className="flex items-center gap-2">
                                     <ListFilter className="h-4 w-4 text-muted-foreground" />
                                     <SelectValue placeholder="Selecione valor..." />
@@ -489,7 +489,7 @@ export function DataEditor() {
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" className={cn(
-                                "h-10 border-muted-foreground/20 gap-2 font-normal text-muted-foreground",
+                                "h-9 border-muted-foreground/20 gap-2 font-normal text-muted-foreground",
                                 dateFilter && "text-teal-700 border-teal-200 bg-teal-50"
                             )}>
                                 <CalendarIcon className="h-4 w-4" />
@@ -519,7 +519,7 @@ export function DataEditor() {
                     </Popover>
 
                     {errorCount > 0 && (
-                        <Button variant="outline" className="h-10 border-red-200 bg-red-50 text-red-600 hover:bg-red-100 gap-2">
+                        <Button variant="outline" className="h-9 border-red-200 bg-red-50 text-red-600 hover:bg-red-100 gap-2">
                             <AlertCircle className="h-4 w-4" />
                             Erros ({errorCount})
                         </Button>
@@ -551,7 +551,7 @@ export function DataEditor() {
                                         <TableHead
                                             key={header}
                                             className={cn(
-                                                "h-10 font-semibold text-xs uppercase tracking-wider text-muted-foreground/80 cursor-pointer hover:text-foreground transition-colors select-none bg-transparent",
+                                                "h-9 font-semibold text-xs uppercase tracking-wider text-muted-foreground/80 cursor-pointer hover:text-foreground transition-colors select-none bg-transparent",
                                                 isNumeric && "text-right pr-6",
                                                 isStatus && "text-center"
                                             )}
@@ -591,18 +591,18 @@ export function DataEditor() {
                                             ${isError ? "bg-red-50/30 hover:bg-red-50/50 border-l-2 border-l-red-500" : ""}
                                         `}
                                         >
-                                            <TableCell className="pl-4 py-3">
+                                            <TableCell className="pl-4 py-2">
                                                 <Checkbox
                                                     checked={isSelected}
                                                     onCheckedChange={(c) => handleSelectRow(globalIndex, c === true)}
                                                 />
                                             </TableCell>
                                             {headers.map((header) => (
-                                                <TableCell key={`${globalIndex}-${header}`} className="py-2 h-10">
+                                                <TableCell key={`${globalIndex}-${header}`} className="py-1 h-9">
                                                     {renderCell(header, row, index, globalIndex)}
                                                 </TableCell>
                                             ))}
-                                            <TableCell className="text-right pr-4 py-2 h-10">
+                                            <TableCell className="text-right pr-4 py-1 h-9">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     {String(row["Status"]).toLowerCase() === "aprovado" ? (
                                                         <Check className="h-4 w-4 text-emerald-600" />
@@ -622,7 +622,7 @@ export function DataEditor() {
                 </div>
 
                 {/* Footer / Pagination */}
-                <div className="flex items-center justify-between border-t p-4 text-sm text-muted-foreground bg-white z-20 shrink-0">
+                <div className="flex items-center justify-between border-t p-2 text-sm text-muted-foreground bg-white z-20 shrink-0">
                     <div>
                         Mostrando <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> a <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> de <span className="font-medium">{filteredData.length}</span> resultados
                     </div>

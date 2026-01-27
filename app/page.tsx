@@ -210,11 +210,11 @@ export default function Home() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Header Section */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Home</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Home</h1>
           <p className="text-lg text-muted-foreground">
             Gerencie seus arquivos contábeis e inicie novos processamentos.
           </p>

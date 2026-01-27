@@ -9,24 +9,24 @@ export default function IntegrationsPage() {
     const [isConnected, setIsConnected] = useState(false);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">Integrações</h1>
-                <p className="text-lg text-muted-foreground">
-                    Conecte ferramentas externas para sincronização de dados.
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">Integrações</h1>
+                <p className="text-sm text-muted-foreground">
+                    Conecte ferramentas externas.
                 </p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                <Card>
-                    <CardHeader>
-                        <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
-                            <Grid className="h-6 w-6" />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card className="shadow-sm">
+                    <CardHeader className="p-4">
+                        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                            <Grid className="h-5 w-5" />
                         </div>
-                        <CardTitle>Google Sheets</CardTitle>
-                        <CardDescription>Sincronize suas planilhas automaticamente.</CardDescription>
+                        <CardTitle className="text-base">Google Sheets</CardTitle>
+                        <CardDescription className="text-xs">Sincronize suas planilhas.</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-4 pt-0">
                         {isConnected ? (
                             <div className="flex items-center space-x-2 text-emerald-600 mb-4 bg-emerald-50 p-2 rounded-md">
                                 <Check className="h-4 w-4" />
@@ -43,16 +43,16 @@ export default function IntegrationsPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="opacity-60 grayscale">
-                    <CardHeader>
-                        <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                            <Cloud className="h-6 w-6" />
+                <Card className="opacity-60 grayscale shadow-sm">
+                    <CardHeader className="p-4">
+                        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                            <Cloud className="h-5 w-5" />
                         </div>
-                        <CardTitle>OneDrive</CardTitle>
-                        <CardDescription>Importe arquivos do Microsoft OneDrive.</CardDescription>
+                        <CardTitle className="text-base">OneDrive</CardTitle>
+                        <CardDescription className="text-xs">Importe do Microsoft OneDrive.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <Button variant="secondary" disabled className="w-full">Em Breve</Button>
+                    <CardContent className="p-4 pt-0">
+                        <Button variant="secondary" disabled className="w-full h-8 text-xs">Em Breve</Button>
                     </CardContent>
                 </Card>
             </div>

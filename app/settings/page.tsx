@@ -51,21 +51,21 @@ export default function SettingsPage() {
     if (isLoading) return <div>Carregando configurações...</div>;
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">Configurações</h1>
-                <p className="text-lg text-muted-foreground">
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">Configurações</h1>
+                <p className="text-sm text-muted-foreground">
                     Gerencie responsáveis, status e preferências do sistema.
                 </p>
             </div>
             <Separator />
 
-            <div className="grid gap-8 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-6">
                     <div>
-                        <h2 className="text-xl font-semibold">Responsáveis</h2>
-                        <p className="text-sm text-muted-foreground">
-                            Adicione ou remova pessoas responsáveis pelos casos.
+                        <h2 className="text-lg font-semibold">Responsáveis</h2>
+                        <p className="text-xs text-muted-foreground">
+                            Adicione ou remova pessoas.
                         </p>
                     </div>
 
@@ -100,9 +100,9 @@ export default function SettingsPage() {
 
                 <div className="space-y-6">
                     <div>
-                        <h2 className="text-xl font-semibold">Status Personalizados</h2>
-                        <p className="text-sm text-muted-foreground">
-                            Configure as etiquetas de status dos seus processos.
+                        <h2 className="text-lg font-semibold">Status Personalizados</h2>
+                        <p className="text-xs text-muted-foreground">
+                            Configure as etiquetas de status.
                         </p>
                     </div>
                     {/* Mock for Status Config - keeping it simple for MVP */}

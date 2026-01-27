@@ -64,7 +64,7 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
     return (
         <div
             className={cn(
-                "relative flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-emerald-500/30 bg-white p-12 transition-all duration-300 dark:bg-card",
+                "relative flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-emerald-500/30 bg-white p-6 transition-all duration-300 dark:bg-card",
                 isDragging && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
             )}
             onDragOver={handleDragOver}
@@ -81,11 +81,11 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
 
             {!file ? (
                 <>
-                    <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-sm dark:bg-emerald-900/30">
-                        <Upload className="h-10 w-10" />
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-sm dark:bg-emerald-900/30">
+                        <Upload className="h-6 w-6" />
                     </div>
-                    <h3 className="mb-2 text-2xl font-bold text-foreground">Upload de Arquivos</h3>
-                    <p className="mb-8 max-w-md text-center text-muted-foreground">
+                    <h3 className="mb-2 text-lg font-bold text-foreground">Upload de Arquivos</h3>
+                    <p className="mb-4 max-w-md text-center text-sm text-muted-foreground">
                         Arraste e solte seus arquivos <span className="font-semibold text-emerald-600">XLSX</span> ou{" "}
                         <span className="font-semibold text-emerald-600">CSV</span> aqui para iniciar a análise automática.
                         <br />

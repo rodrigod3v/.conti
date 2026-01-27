@@ -71,18 +71,18 @@ export function KpiCards() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {kpis.map((kpi) => (
                 <Card key={kpi.title} className="shadow-sm">
-                    <CardContent className="p-6">
+                    <CardContent className="p-4">
                         <div className="flex items-center justify-between">
-                            <div className={`p-3 rounded-lg ${kpi.iconBg}`}>
-                                <kpi.icon className={`h-6 w-6 ${kpi.iconColor}`} />
+                            <div className={`p-2 rounded-lg ${kpi.iconBg}`}>
+                                <kpi.icon className={`h-5 w-5 ${kpi.iconColor}`} />
                             </div>
-                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${kpi.badgeColor}`}>
+                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${kpi.badgeColor}`}>
                                 {kpi.badge}
                             </span>
                         </div>
-                        <div className="mt-4">
-                            <p className="text-sm font-medium text-muted-foreground">{kpi.title}</p>
-                            <h3 className="text-3xl font-bold mt-1">{kpi.value}</h3>
+                        <div className="mt-2">
+                            <p className="text-xs font-medium text-muted-foreground">{kpi.title}</p>
+                            <h3 className="text-2xl font-bold mt-0.5">{kpi.value}</h3>
                         </div>
                     </CardContent>
                 </Card>
