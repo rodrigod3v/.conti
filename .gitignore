@@ -61,6 +61,13 @@ Thumbs.db
 *.swp
 project.zip
 
-# security
+
+# deployment artifacts
+deploy.zip
+deploy_package/
+backup_production.db
+
+# sensitive
 *.key
+*.pem
 *.pub
