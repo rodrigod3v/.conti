@@ -27,8 +27,8 @@ sudo chmod 755 ~/app_data
 # 3. Clean & Unzip App
 echo "Deploying App..."
 sudo rm -rf ~/app/*
-# Use 7z
-7z x ~/deploy.zip -o/home/ubuntu/app -y > /dev/null
+# Use unzip
+unzip -o ~/deploy.zip -d /home/ubuntu/app > /dev/null
 
 # 4. Create .env for Prisma
 echo "Creating .env..."

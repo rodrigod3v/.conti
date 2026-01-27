@@ -1,85 +1,83 @@
 # Deploy Guide: Accounting Control System
-This document outlines the complete process to deploy the application to the Production VM.
 
-## 1. Environment Overview
+Este guia descreve o processo completo para realizar o deploy da aplicação em sua VM de Produção.
+
+## 1. Visão Geral do Ambiente
 - **Target VM**: 1 OCPU, 1GB RAM (Oracle Cloud)
 - **OS**: Ubuntu 24.04
 - **Runtime**: Node.js 20 (PM2)
-- **Database**: SQLite (Persistent at `~/app_data/production.db`)
-- **Key File**: `ssh-key-2026-01-26.key` (Keep this safe!)
+- **Banco de Dados**: SQLite (Persistente em `~/app_data/production.db`)
+- **Key File**: `ssh-key-2026-01-26.key` (Mantenha seguro!)
 
-## 2. Prerequisites (Local Machine)
-Ensure you have the following tools installed:
+## 2. Pré-requisitos (Máquina Local)
+Certifique-se de ter instalado:
 - Node.js & npm
 - PowerShell (Windows)
-- OpenSSH Client
+- Cliente OpenSSH
+- **Importante**: O comando `tar` deve estar disponível no PowerShell para compactação correta (vem padrão no Windows 10/11 moderno).
 
-## 3. Configuration Files
-### `next.config.ts`
-Must have `output: "standalone"` enabled for low-memory environments.
+## 3. Processo de Deploy (Passo a Passo)
 
-### `prisma/schema.prisma`
-Datasource must use environment variable:
-```prisma
-datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
-```
+### Passo 1: Compilar e Empacotar
+Execute o script de automação na raiz do projeto. Este script irá construir a aplicação, preparar a pasta de deploy, copiar o schema do Prisma e gerar o arquivo `deploy.zip` compatível com Linux.
 
-## 4. Deployment Process (Step-by-Step)
-
-### Step 1: Build Locally
-Run the build command in your project root to generate optimized artifacts.
-```powershell
-npm run build
-```
-
-### Step 2: Package Application
-Run the included PowerShell script to create `deploy.zip`.
 ```powershell
 .\scripts\package_deploy.ps1
 ```
-*Creates `deploy.zip` in the project root.*
+*Saída esperada*: Um arquivo `deploy.zip` na raiz do projeto.
 
-### Step 3: Upload to Server
-Use SCP to transfer the package and the deployment script.
-Replace `your-key.pem` with the actual path to your SSH key.
+### Passo 2: Enviar para o Servidor
+Use o comando SCP para transferir o pacote e o script de finalização.
+Substitua `"caminho/para/chave.key"` pelo caminho real da sua chave SSH.
+
 ```powershell
-# Upload Package
-scp -i "path/to/ssh-key-2026-01-26.key" deploy.zip ubuntu@144.22.254.132:~/deploy.zip
+# Upload do Pacote
+scp -i "ssh-key-2026-01-26.key" deploy.zip ubuntu@144.22.254.132:~/deploy.zip
 
-# Upload Deployment Script (if changed)
-scp -i "path/to/ssh-key-2026-01-26.key" scripts/finalize_deploy.sh ubuntu@144.22.254.132:~/finalize_deploy.sh
+# Upload do Script de Instalação (caso tenha sido alterado)
+scp -i "ssh-key-2026-01-26.key" scripts/finalize_deploy.sh ubuntu@144.22.254.132:~/finalize_deploy.sh
 ```
 
-### Step 4: Execute Deployment
-Connect to the VM and run the deployment script.
-```powershell
-ssh -i "path/to/ssh-key-2026-01-26.key" ubuntu@144.22.254.132 "bash finalize_deploy.sh"
-```
-*This script automatically updates the app, keeps the database safe, and restarts PM2.*
+### Passo 3: Finalizar Instalação
+Conecte-se à VM e execute o script de finalização. Este script cuida de:
+- Parar a aplicação antiga.
+- Backup do banco de dados existente.
+- Extração segura dos arquivos.
+- Instalação de dependências e **Geração do Cliente Prisma**.
+- Reinício do processo via PM2.
 
-## 5. Database Management
-The database is stored outside the application folder to prevent data loss during updates.
-- **Location**: `/home/ubuntu/app_data/production.db`
-
-### Backup Database
-To download the production database to your local machine:
 ```powershell
-scp -i "path/to/ssh-key-2026-01-26.key" ubuntu@144.22.254.132:~/app_data/production.db ./backup_production.db
+ssh -i "ssh-key-2026-01-26.key" ubuntu@144.22.254.132 "bash finalize_deploy.sh"
 ```
 
-### Restore / Overwrite Database
-To upload a local database (e.g., `dev.db`) to production:
-1. Rename your local file to `dev.db`.
-2. Upload it to the user's home directory:
-   ```powershell
-   scp -i "path/to/ssh-key-2026-01-26.key" dev.db ubuntu@144.22.254.132:~/dev.db
-   ```
-3. Run the deployment script (it detects `~/dev.db` and moves it to production specific location).
+## 4. Gestão de Banco de Dados
+O banco de dados é mantido fora da pasta da aplicação para evitar perda de dados durante updates.
+- **Localização**: `/home/ubuntu/app_data/production.db`
 
-## 6. Troubleshooting
-- **Logs**: `ssh ... "pm2 logs next-app"`
-- **Status**: `ssh ... "pm2 status"`
-- **Restart**: `ssh ... "pm2 restart next-app"`
+### Backup Local
+Para baixar o banco de produção para sua máquina:
+```powershell
+scp -i "ssh-key-2026-01-26.key" ubuntu@144.22.254.132:~/app_data/production.db ./backup_production.db
+```
+
+## 5. Troubleshooting / Comandos Úteis
+
+Se algo der errado, use estes comandos na VM para investigar:
+
+### Verificar Status
+```bash
+pm2 status
+```
+
+### Ver Logs (Erros)
+```bash
+pm2 logs next-app --err --lines 50
+```
+
+### Forçar Regeneração do Prisma
+Se houver erro de "Prisma Client not initialized":
+```bash
+cd ~/app
+npx prisma generate
+pm2 restart next-app
+```
