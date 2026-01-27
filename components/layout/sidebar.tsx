@@ -35,9 +35,19 @@ const sidebarItems = [
 
 import { useAppStore } from "@/lib/store";
 
+import { getSession, logout } from "@/app/actions/auth";
+import { useState, useEffect } from "react";
+
 export function Sidebar() {
     const pathname = usePathname();
     const { fileData, isSidebarOpen, toggleSidebar } = useAppStore();
+    const [user, setUser] = useState<{ name: string | null; email: string } | null>(null);
+
+    useEffect(() => {
+        getSession().then(u => {
+            if (u) setUser(u);
+        });
+    }, []);
 
     const mainItems = sidebarItems.filter(item => ["Home", "Editor", "Dashboard"].includes(item.title));
     const systemItems = sidebarItems.filter(item => ["Configurações", "Integrações"].includes(item.title));
@@ -112,19 +122,21 @@ export function Sidebar() {
 
                 <div className="mt-auto">
                     <div className="border-t pt-4">
-                        <button className="flex w-full items-center rounded-lg p-2 text-sm text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-all">
+                        <button
+                            onClick={() => logout()}
+                            className="flex w-full items-center rounded-lg p-2 text-sm text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-all">
                             <LogOut className="h-4 w-4" />
                             <span className="ml-3">Sair</span>
                         </button>
                     </div>
 
                     <div className="mt-4 flex items-center gap-3 rounded-xl bg-muted/50 p-2">
-                        <div className="h-8 w-8 overflow-hidden rounded-full border border-border">
-                            <img src="https://github.com/shadcn.png" alt="User" />
+                        <div className="h-8 w-8 overflow-hidden rounded-full border border-border flex items-center justify-center bg-emerald-100 text-emerald-700 font-bold">
+                            {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
                         </div>
-                        <div className="flex flex-col">
-                            <span className="text-xs font-medium text-foreground">Carlos Mendes</span>
-                            <span className="text-[10px] text-muted-foreground">carlos@cpa.com.br</span>
+                        <div className="flex flex-col overflow-hidden">
+                            <span className="text-xs font-medium text-foreground truncate">{user?.name || "Usuário"}</span>
+                            <span className="text-[10px] text-muted-foreground truncate">{user?.email || ""}</span>
                         </div>
                     </div>
                 </div>

@@ -15,6 +15,7 @@ Certifique-se de ter instalado:
 - PowerShell (Windows)
 - Cliente OpenSSH
 - **Importante**: O comando `tar` deve estar disponível no PowerShell para compactação correta (vem padrão no Windows 10/11 moderno).
+- **Dependências**: Certifique-se de que todas as dependências estão instaladas, execute `npm install` (isso instalará `next-themes` e outras bibliotecas necessárias).
 
 ## 3. Processo de Deploy (Passo a Passo)
 

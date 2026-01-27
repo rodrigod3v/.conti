@@ -2,10 +2,16 @@
 
 import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react";
-import { useState } from "react";
+import { useState, useActionState } from "react";
+import { login, register } from "@/app/actions/auth";
 
 export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
+    const [isRegister, setIsRegister] = useState(false);
+
+    // Server Actions State
+    const [loginState, loginAction] = useActionState(login, null);
+    const [registerState, registerAction] = useActionState(register, null);
 
     return (
         <div className="flex min-h-screen flex-col bg-background-light text-deep-blue dark:bg-background-dark dark:text-white">
@@ -60,7 +66,7 @@ export default function LoginPage() {
                             Identidade visual para o sistema .conti
                         </p>
                     </div>
-                    <form className="space-y-6 px-8 pb-12" onSubmit={(e) => e.preventDefault()}>
+                    <form className="space-y-6 px-8 pb-12" action={isRegister ? registerAction : loginAction}>
                         <div className="flex flex-col gap-1.5">
                             <label className="text-sm font-bold text-deep-blue dark:text-slate-200">
                                 E-mail
@@ -68,9 +74,11 @@ export default function LoginPage() {
                             <div className="relative">
                                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-xl text-slate-400" size={20} />
                                 <input
+                                    name="email"
                                     className="w-full rounded-lg border border-[#dbdfe6] bg-white py-3.5 pl-10 pr-4 outline-none transition-all focus:border-action-orange focus:ring-2 focus:ring-action-orange/20 dark:border-slate-700 dark:bg-slate-800 placeholder:text-slate-400"
                                     placeholder="nome@empresa.com.br"
                                     type="email"
+                                    required
                                 />
                             </div>
                         </div>
@@ -79,19 +87,16 @@ export default function LoginPage() {
                                 <label className="text-sm font-bold text-deep-blue dark:text-slate-200">
                                     Senha
                                 </label>
-                                <Link
-                                    className="text-xs font-bold text-action-orange hover:underline"
-                                    href="#"
-                                >
-                                    Esqueci minha senha
-                                </Link>
                             </div>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-xl text-slate-400" size={20} />
                                 <input
+                                    name="password"
                                     className="w-full rounded-lg border border-[#dbdfe6] bg-white py-3.5 pl-10 pr-12 outline-none transition-all focus:border-action-orange focus:border-action-orange focus:ring-2 focus:ring-action-orange/20 dark:border-slate-700 dark:bg-slate-800 placeholder:text-slate-400"
-                                    placeholder="Digite sua senha"
+                                    placeholder={isRegister ? "Mínimo 6 caracteres" : "Digite sua senha"}
                                     type={showPassword ? "text" : "password"}
+                                    required
+                                    minLength={isRegister ? 6 : 1}
                                 />
                                 <button
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-deep-blue dark:hover:text-white"
@@ -102,34 +107,34 @@ export default function LoginPage() {
                                 </button>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 py-1">
-                            <input
-                                className="h-4 w-4 rounded border-[#dbdfe6] text-action-orange focus:ring-action-orange"
-                                id="remember"
-                                type="checkbox"
-                            />
-                            <label
-                                className="cursor-pointer text-sm font-medium text-slate-600 dark:text-slate-400"
-                                htmlFor="remember"
-                            >
-                                Lembrar de mim
-                            </label>
-                        </div>
+
+                        {(loginState as any)?.error && (
+                            <div className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-600 dark:bg-red-900/20">
+                                {(loginState as any).error}
+                            </div>
+                        )}
+                        {(registerState as any)?.error && (
+                            <div className="rounded-lg bg-red-50 p-3 text-sm font-medium text-red-600 dark:bg-red-900/20">
+                                {(registerState as any).error}
+                            </div>
+                        )}
+
                         <button
                             className="flex w-full items-center justify-center gap-2 rounded-lg bg-action-orange py-4 font-extrabold text-white shadow-lg shadow-action-orange/20 transition-all hover:bg-[#e67e00] active:scale-[0.98]"
                             type="submit"
                         >
-                            <span>Entrar</span>
+                            <span>{isRegister ? "Criar Conta" : "Entrar"}</span>
                             <LogIn size={20} />
                         </button>
                         <p className="pt-2 text-center text-sm text-slate-600 dark:text-slate-400">
-                            Ainda não possui acesso?{" "}
-                            <Link
+                            {isRegister ? "Já possui conta? " : "Ainda não possui acesso? "}
+                            <button
+                                type="button"
                                 className="font-bold text-action-orange hover:underline"
-                                href="#"
+                                onClick={() => setIsRegister(!isRegister)}
                             >
-                                Solicite aqui
-                            </Link>
+                                {isRegister ? "Faça login" : "Solicite aqui"}
+                            </button>
                         </p>
                     </form>
                 </div>

@@ -308,11 +308,11 @@ export default function CaseDetailsPage() {
                                 </DialogHeader>
                                 <div className="flex-1 overflow-y-auto px-6 py-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {/* Left Column: Basic Info */}
+                                        {/* Column 1: Contexto e Prazos (Who & When) */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-2 border-b pb-2 mb-4">
                                                 <Briefcase className="h-4 w-4 text-blue-600" />
-                                                <h3 className="font-bold text-sm text-gray-900">Cliente e Responsável</h3>
+                                                <h3 className="font-bold text-sm text-gray-900">Contexto e Prazos</h3>
                                             </div>
 
                                             {/* Client */}
@@ -348,129 +348,150 @@ export default function CaseDetailsPage() {
                                                     </SelectContent>
                                                 </Select>
                                             </div>
-                                        </div>
-                                    </div>
 
-                                    {/* Middle Column: Extra/Dynamic Fields */}
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                                            <AlignLeft className="h-4 w-4 text-orange-600" />
-                                            <h3 className="font-bold text-sm text-gray-900">Detalhes do Caso</h3>
-                                        </div>
+                                            <Separator />
 
-                                        {/* Title */}
-                                        <div className="space-y-2">
-                                            <Label className="text-xs font-semibold text-gray-600 uppercase">Título / Descrição</Label>
-                                            <Input
-                                                value={editForm["Inconsistencias"] || editForm["Descrição"] || ""}
-                                                onChange={(e) => {
-                                                    const key = Object.keys(editForm).find(k => k.toLowerCase().includes("inconsist") || k.toLowerCase().includes("descri"));
-                                                    if (key) setEditForm({ ...editForm, [key]: e.target.value });
-                                                }}
-                                                className="border-gray-300"
-                                            />
-                                        </div>
+                                            {/* Dates (Moved from old Col 2) */}
+                                            <div className="grid grid-cols-1 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Data Abertura</Label>
+                                                    <Input
+                                                        value={editForm["Data"] || editForm["Data Abertura"] || ""}
+                                                        onChange={(e) => {
+                                                            const key = Object.keys(editForm).find(k => k.toLowerCase() === "data" || k.toLowerCase() === "data abertura");
+                                                            if (key) setEditForm({ ...editForm, [key]: e.target.value });
+                                                        }}
+                                                        className="border-gray-300"
+                                                        placeholder="DD/MM/AAAA"
+                                                    />
+                                                </div>
 
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {/* Date Inputs */}
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Data Abertura</Label>
-                                                <Input
-                                                    value={editForm["Data"] || editForm["Data Abertura"] || ""}
-                                                    onChange={(e) => {
-                                                        const key = Object.keys(editForm).find(k => k.toLowerCase() === "data" || k.toLowerCase() === "data abertura");
-                                                        if (key) setEditForm({ ...editForm, [key]: e.target.value });
-                                                    }}
-                                                    className="border-gray-300"
-                                                    placeholder="DD/MM/AAAA"
-                                                />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Vencimento</Label>
-                                                <Input
-                                                    value={editForm["Data Vencimento"] || editForm["vencimento"] || ""}
-                                                    onChange={(e) => {
-                                                        const key = Object.keys(editForm).find(k => k.toLowerCase().includes("vencimento"));
-                                                        if (key) setEditForm({ ...editForm, [key]: e.target.value });
-                                                    }}
-                                                    className="border-gray-300"
-                                                    placeholder="DD/MM/AAAA"
-                                                />
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Vencimento</Label>
+                                                    <Input
+                                                        value={editForm["Data Vencimento"] || editForm["vencimento"] || ""}
+                                                        onChange={(e) => {
+                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("vencimento"));
+                                                            if (key) setEditForm({ ...editForm, [key]: e.target.value });
+                                                        }}
+                                                        className="border-gray-300"
+                                                        placeholder="DD/MM/AAAA"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="pt-4 mt-2 border-t border-gray-100">
-                                            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">
-                                                Outros Campos
-                                            </Label>
+                                        {/* Column 2: Detalhes do Lançamento (What) */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                                                <AlignLeft className="h-4 w-4 text-orange-600" />
+                                                <h3 className="font-bold text-sm text-gray-900">Detalhes do Lançamento</h3>
+                                            </div>
 
-                                            <div className="grid grid-cols-2 gap-4 pr-2">
-                                                {Object.keys(editForm)
-                                                    .filter(key => {
+                                            {/* Dynamic Fields */}
+                                            <div className="pt-2">
+                                                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">
+                                                    Outros Campos
+                                                </Label>
+
+                                                <div className="grid grid-cols-1 gap-4 pr-2 max-h-[300px] overflow-y-auto">
+                                                    {Object.keys(editForm)
+                                                        .filter(key => {
+                                                            const lower = key.toLowerCase();
+                                                            return !lower.includes("inconsist") && !lower.includes("descri") &&
+                                                                !lower.includes("empresa") && !lower.includes("cliente") &&
+                                                                !lower.includes("valor") && !lower.includes("vencimento") &&
+                                                                !lower.includes("respons") && !lower.includes("usuario") &&
+                                                                !lower.includes("status") && !lower.includes("observ") &&
+                                                                !lower.includes("notas") && !lower.includes("data");
+                                                        })
+                                                        .sort()
+                                                        .map((key) => {
+                                                            const options = uniqueOptions[key] || [];
+                                                            const useDropdown = options.length > 1 && options.length < 20;
+                                                            const currentValue = editForm[key] || "";
+
+                                                            return (
+                                                                <div key={key} className="space-y-2">
+                                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">{key}</Label>
+                                                                    {useDropdown ? (
+                                                                        <Select
+                                                                            value={currentValue}
+                                                                            onValueChange={(val) => setEditForm({ ...editForm, [key]: val })}
+                                                                        >
+                                                                            <SelectTrigger className="border-gray-300">
+                                                                                <SelectValue placeholder={`Selecione ${key}`} />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                {options.map((opt) => (
+                                                                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                                                                ))}
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    ) : (
+                                                                        <Input
+                                                                            value={currentValue}
+                                                                            onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                                                                            className="border-gray-300"
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    {/* Empty state if no extra fields */}
+                                                    {Object.keys(editForm).filter(key => {
                                                         const lower = key.toLowerCase();
                                                         return !lower.includes("inconsist") && !lower.includes("descri") &&
                                                             !lower.includes("empresa") && !lower.includes("cliente") &&
                                                             !lower.includes("valor") && !lower.includes("vencimento") &&
                                                             !lower.includes("respons") && !lower.includes("usuario") &&
                                                             !lower.includes("status") && !lower.includes("observ") &&
-                                                            !lower.includes("notas");
-                                                    })
-                                                    .sort()
-                                                    .map((key) => {
-                                                        const options = uniqueOptions[key] || [];
-                                                        const useDropdown = options.length > 1 && options.length < 20;
-                                                        const currentValue = editForm[key] || "";
-
-                                                        return (
-                                                            <div key={key} className="space-y-2">
-                                                                <Label className="text-xs font-semibold text-gray-600 uppercase">{key}</Label>
-                                                                {useDropdown ? (
-                                                                    <Select
-                                                                        value={currentValue}
-                                                                        onValueChange={(val) => setEditForm({ ...editForm, [key]: val })}
-                                                                    >
-                                                                        <SelectTrigger className="border-gray-300">
-                                                                            <SelectValue placeholder={`Selecione ${key}`} />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            {options.map((opt) => (
-                                                                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                ) : (
-                                                                    <Input
-                                                                        value={currentValue}
-                                                                        onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
-                                                                        className="border-gray-300"
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                {/* Empty state if no extra fields */}
-                                                {Object.keys(editForm).filter(key => {
-                                                    const lower = key.toLowerCase();
-                                                    return !lower.includes("inconsist") && !lower.includes("descri") &&
-                                                        !lower.includes("empresa") && !lower.includes("cliente") &&
-                                                        !lower.includes("valor") && !lower.includes("vencimento") &&
-                                                        !lower.includes("respons") && !lower.includes("usuario") &&
-                                                        !lower.includes("status") && !lower.includes("observ") &&
-                                                        !lower.includes("notas");
-                                                }).length === 0 && (
-                                                        <div className="text-sm text-gray-500 italic py-4">Nenhum campo adicional disponível.</div>
-                                                    )}
+                                                            !lower.includes("notas") && !lower.includes("data");
+                                                    }).length === 0 && (
+                                                            <div className="text-sm text-gray-500 italic py-4">Nenhum campo adicional disponível.</div>
+                                                        )}
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* Right Column: Status & Management */}
+                                        {/* Column 3: Ação e Financeiro (Impact & Resolution) */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-2 border-b pb-2 mb-4">
                                                 <Wallet className="h-4 w-4 text-emerald-600" />
-                                                <h3 className="font-bold text-sm text-gray-900">Financeiro e Outros</h3>
+                                                <h3 className="font-bold text-sm text-gray-900">Ação e Financeiro</h3>
                                             </div>
 
+                                            {/* Status (Moved to top of Col 3) */}
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Status</Label>
+                                                <Select
+                                                    value={editForm["Status"] || editForm["status"] || ""}
+                                                    onValueChange={(val) => {
+                                                        const key = Object.keys(editForm).find(k => k.toLowerCase() === "status");
+                                                        if (key) setEditForm({ ...editForm, [key]: val });
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="border-gray-300 bg-gray-50/50">
+                                                        <SelectValue placeholder="Selecione o status" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {(uniqueOptions["Status"] || uniqueOptions["status"] || ["Pendente", "Em Andamento", "Concluído"]).map((opt) => (
+                                                            <SelectItem key={opt} value={opt}>
+                                                                <span className={cn(
+                                                                    "font-medium",
+                                                                    opt.toLowerCase() === "pendente" && "text-amber-600",
+                                                                    opt.toLowerCase() === "erro" && "text-red-600",
+                                                                    (opt.toLowerCase() === "concluído" || opt.toLowerCase() === "resolvido" || opt.toLowerCase() === "ok") && "text-emerald-600"
+                                                                )}>
+                                                                    {opt}
+                                                                </span>
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            {/* Financial Values */}
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-2">
                                                     <Label className="text-xs font-semibold text-gray-600 uppercase">Valor (R$)</Label>
@@ -503,36 +524,6 @@ export default function CaseDetailsPage() {
                                                         className="border-gray-300 font-mono"
                                                     />
                                                 </div>
-                                            </div>
-
-                                            {/* Status Dropdown */}
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Status</Label>
-                                                <Select
-                                                    value={editForm["Status"] || editForm["status"] || ""}
-                                                    onValueChange={(val) => {
-                                                        const key = Object.keys(editForm).find(k => k.toLowerCase() === "status");
-                                                        if (key) setEditForm({ ...editForm, [key]: val });
-                                                    }}
-                                                >
-                                                    <SelectTrigger className="border-gray-300 bg-gray-50/50">
-                                                        <SelectValue placeholder="Selecione o status" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {(uniqueOptions["Status"] || uniqueOptions["status"] || ["Pendente", "Em Andamento", "Concluído"]).map((opt) => (
-                                                            <SelectItem key={opt} value={opt}>
-                                                                <span className={cn(
-                                                                    "font-medium",
-                                                                    opt.toLowerCase() === "pendente" && "text-amber-600",
-                                                                    opt.toLowerCase() === "erro" && "text-red-600",
-                                                                    (opt.toLowerCase() === "concluído" || opt.toLowerCase() === "resolvido" || opt.toLowerCase() === "ok") && "text-emerald-600"
-                                                                )}>
-                                                                    {opt}
-                                                                </span>
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
                                             </div>
 
                                             {/* Quick Notes */}

@@ -34,3 +34,12 @@ model Setting {
   responsibles String // JSON array of names
   status       String // JSON array of custom statuses
 }
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  age       Int?
+  createdAt DateTime @default(now())
+}

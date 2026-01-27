@@ -75,6 +75,7 @@ O projeto utiliza as tecnologias mais recentes do ecossistema React/Next.js para
 1.  Clone o repositório e instale as dependências:
     ```bash
     npm install
+    # Importante: Isso instalará automaticamente o 'next-themes' e outras dependências críticas.
     ```
 
 2.  Configure o banco de dados:
