@@ -46,6 +46,9 @@ cd ~/app
 # Reinstall node_modules if needed
 npm install --omit=dev
 
+echo "Generating Prisma Client..."
+npx prisma generate
+
 echo "Starting with PM2..."
 pm2 start server.js --name "next-app"
 pm2 save

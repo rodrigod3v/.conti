@@ -7,50 +7,69 @@ export async function POST(request: Request) {
     const { name, size, rows } = body;
 
     // Check if file already exists
+    let fileId: string;
     const existingFile = await prisma.file.findFirst({
       where: { name },
     });
 
     if (existingFile) {
-        // Update existing file: update timestamp and rows
-        // Note: For simplicity, we are deleting old rows and adding new ones to ensure fresh data.
-        // In a production app, we might want to be more careful.
-        const updatedFile = await prisma.$transaction([
-            prisma.row.deleteMany({ where: { fileId: existingFile.id } }),
-            prisma.file.update({
-                where: { id: existingFile.id },
-                data: {
-                    size,
-                    rows: {
-                        create: rows.map((row: any) => ({
-                            data: JSON.stringify(row),
-                        })),
-                    },
-                },
-                include: { rows: true }
-            })
-        ]);
-
-        return NextResponse.json(updatedFile[1]); // Return the updated file
+      // Update existing file: update timestamp and size
+        await prisma.file.update({
+            where: { id: existingFile.id },
+            data: { size }
+        });
+        
+        // Delete all existing rows for this file
+        await prisma.row.deleteMany({ where: { fileId: existingFile.id } });
+        fileId = existingFile.id;
+    } else {
+        // Create new file record
+        const newFile = await prisma.file.create({
+            data: {
+                name,
+                size,
+                status: "Processing"
+            }
+        });
+        fileId = newFile.id;
     }
 
-    // Create new file
-    const newFile = await prisma.file.create({
-      data: {
-        name,
-        size,
-        rows: {
-          create: rows.map((row: any) => ({
-            data: JSON.stringify(row), // Storing dynamic row data as JSON string
-          })),
-        },
-      },
-      include: {
-        rows: true,
-      }
-    });
+    // Batch Insert Logic
+    const BATCH_SIZE = 500;
+    try {
+        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+            const chunk = rows.slice(i, i + BATCH_SIZE);
+            
+            await prisma.row.createMany({
+                data: chunk.map((row: any) => ({
+                    fileId: fileId,
+                    data: JSON.stringify(row),
+                }))
+            });
+        }
+        
+        // Update status to Processed when done
+        const finalFile = await prisma.file.update({
+            where: { id: fileId },
+            data: { status: "Processed" },
+            include: { rows: true }
+        });
 
-    return NextResponse.json(newFile);
+        return NextResponse.json(finalFile);
+
+    } catch (insertError) {
+        console.error("Error during batch insert:", insertError);
+        // Cleanup: Use query directly if possible or finding unique ID might be hard if we just created it.
+        // If it was a new file, maybe delete it. If existing, we already wiped the rows, so it's in a bad state.
+        // Best approach: Mark as Error.
+        await prisma.file.update({
+            where: { id: fileId },
+            data: { status: "Error" }
+        });
+        
+        throw insertError; 
+    }
+
   } catch (error) {
     console.error("Error creating file:", error);
     return NextResponse.json(

@@ -24,8 +24,15 @@ Write-Host "Copying Public Folder..."
 New-Item -ItemType Directory -Force -Path "$deployDir\public" | Out-Null
 Copy-Item -Recurse "$baseDir\public\*" -Destination "$deployDir\public"
 
-# 4. Zip it
+# 4. Copy Prisma Folder (For DB Schema)
+Write-Host "Copying Prisma Folder..."
+New-Item -ItemType Directory -Force -Path "$deployDir\prisma" | Out-Null
+Copy-Item -Recurse "$baseDir\prisma\*" -Destination "$deployDir\prisma"
+
+# 5. Zip it (Using tar for POSIX paths)
 Write-Host "Compressing to deploy.zip..."
-Compress-Archive -Path "$deployDir\*" -DestinationPath $deployZip
+Set-Location $deployDir
+tar -a -c -f $deployZip *
+Set-Location $baseDir
 
 Write-Host "Done! Package at: $deployZip"
