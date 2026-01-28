@@ -31,7 +31,7 @@ export const isDateColumn = (key: string): boolean => {
 
 export const isCurrencyColumn = (key: string): boolean => {
     const lower = key.toLowerCase();
-    return lower.includes("valor") || lower.includes("montante") || lower.includes("liquido") || lower.includes("líquido") || lower.includes("custo") || lower.includes("preço");
+    return lower.includes("valor") || lower.includes("montante") || lower.includes("liquido") || lower.includes("líquido") || lower.includes("bruto") || lower.includes("custo") || lower.includes("preço");
 };
 
 export const isNumericColumn = (key: string): boolean => {

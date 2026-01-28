@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { isDropdownColumn, isDateColumn, isCurrencyColumn, isNumericColumn, isObservationColumn } from "@/lib/column-utils";
+import { getFieldConfig, shouldFormatCurrency, isDropdownField, isDateField, isTextareaField } from "@/lib/field-config";
 
 
 
@@ -246,7 +246,12 @@ export default function CaseDetailsPage() {
             const row = fileData[caseData.rowIndex];
             const formData: Record<string, string> = {};
             Object.keys(row).forEach(key => {
-                formData[key] = String(row[key] || "");
+                let value = String(row[key] || "");
+                // Auto-format currency fields on load using field configuration
+                if (shouldFormatCurrency(key) && value) {
+                    value = formatCurrency(value);
+                }
+                formData[key] = value;
             });
             setEditForm(formData);
         }
@@ -487,10 +492,18 @@ export default function CaseDetailsPage() {
                                                         .sort()
                                                         .map((key) => {
                                                             const options = uniqueOptions[key] || [];
-                                                            // Smart Dropdown Logic: Use dropdown if explicitly defined OR if it has few unique options (< 20)
-                                                            // BUT never use dropdown for date, currency, or numeric fields
-                                                            const useDropdown = !isDateColumn(key) && !isCurrencyColumn(key) && !isNumericColumn(key) && (isDropdownColumn(key) || (options.length > 0 && options.length <= 20));
+                                                            const fieldConfig = getFieldConfig(key);
                                                             const currentValue = editForm[key] || "";
+
+                                                            // Determine if this should be a dropdown based on field configuration
+                                                            const useDropdown = fieldConfig.type === 'dropdown' ||
+                                                                (fieldConfig.type === 'text' && options.length > 0 && options.length <= 20);
+
+                                                            // Determine if this is a currency field
+                                                            const isCurrency = fieldConfig.type === 'currency' && fieldConfig.formatCurrency;
+
+                                                            // Determine if this is a textarea
+                                                            const isTextarea = fieldConfig.type === 'textarea';
 
                                                             return (
                                                                 <div key={key} className="space-y-2">
@@ -509,11 +522,26 @@ export default function CaseDetailsPage() {
                                                                                 ))}
                                                                             </SelectContent>
                                                                         </Select>
+                                                                    ) : isTextarea ? (
+                                                                        <Textarea
+                                                                            value={currentValue}
+                                                                            onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                                                                            className="border-gray-300 min-h-[80px]"
+                                                                        />
                                                                     ) : (
                                                                         <Input
                                                                             value={currentValue}
                                                                             onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
-                                                                            className="border-gray-300"
+                                                                            onBlur={(e) => {
+                                                                                // Apply currency formatting if it's a currency field
+                                                                                if (isCurrency) {
+                                                                                    handleCurrencyBlur(key, e.target.value);
+                                                                                }
+                                                                            }}
+                                                                            className={cn(
+                                                                                "border-gray-300",
+                                                                                isCurrency && "font-mono text-right"
+                                                                            )}
                                                                         />
                                                                     )}
                                                                 </div>

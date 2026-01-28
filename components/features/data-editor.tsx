@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { isDropdownColumn, isDateColumn, isCurrencyColumn, isObservationColumn } from "@/lib/column-utils";
+import { getFieldConfig, shouldFormatCurrency, isDropdownField, isDateField, isTextareaField } from "@/lib/field-config";
+import { FieldConfiguration } from "@/components/features/field-configuration";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,14 +33,12 @@ import {
     Check,
     Pencil,
     Trash2,
-    ChevronLeft,
-    ChevronRight,
-    ListFilter,
-    ArrowUpDown,
-    ArrowUp,
     ArrowDown,
     X,
-    PlusCircle
+    PlusCircle,
+    ChevronDown,
+    ChevronUp,
+    ListFilter
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
@@ -122,10 +121,16 @@ const ObservationCell = ({ value, globalIndex, header, updateCell }: { value: st
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <div
-                    className="text-xs text-foreground/80 block max-w-[200px] truncate cursor-pointer hover:bg-blue-50/50 hover:text-blue-700 rounded px-2 py-1 transition-colors border border-transparent hover:border-blue-100 min-h-[32px] flex items-center"
+                    className="text-xs text-foreground/80 block max-w-[300px] cursor-pointer hover:bg-blue-50/50 hover:text-blue-700 rounded px-2 py-1 transition-colors border border-transparent hover:border-blue-100 min-h-[32px] flex items-center"
                     title="Clique para editar observação completa"
                 >
-                    {value ? value : <span className="text-muted-foreground/40 italic text-[10px]">Adicionar...</span>}
+                    {value ? (
+                        <span>
+                            {value.length > 30 ? value.substring(0, 30) + "..." : value}
+                        </span>
+                    ) : (
+                        <span className="text-muted-foreground/40 italic text-[10px]">Adicionar...</span>
+                    )}
                 </div>
             </PopoverTrigger>
             <PopoverContent className="w-[400px] p-4 shadow-xl" align="start" side="bottom">
@@ -173,14 +178,15 @@ const EditableCell = ({
 }) => {
     const value = row[header] || "";
     const headerLower = header.toLowerCase();
+    const fieldConfig = getFieldConfig(header);
 
     // 1. Observation / Description - Popover Textarea
-    if (isObservationColumn(header)) {
+    if (fieldConfig.type === 'textarea') {
         return <ObservationCell value={value} globalIndex={globalIndex} header={header} updateCell={updateCell} />;
     }
 
-    // 2. Dropdown Fields (Status, Nome, Cliente, Produto, Unidade)
-    if (isDropdownColumn(header)) {
+    // 2. Dropdown Fields
+    if (fieldConfig.type === 'dropdown') {
         const options = allUniqueValues[header] || [];
         return (
             <Select value={value} onValueChange={(val) => updateCell(globalIndex, header, val)}>
@@ -198,7 +204,7 @@ const EditableCell = ({
     }
 
     // 3. Date Input
-    if (isDateColumn(header)) {
+    if (fieldConfig.type === 'date') {
         let displayValue = value;
         const num = parseFloat(String(value));
         if (!isNaN(num) && num > 20000 && String(value).trim().match(/^\d+(\.\d+)?$/)) {
@@ -218,13 +224,54 @@ const EditableCell = ({
         );
     }
 
-    // 4. Money/Numeric Input
-    if (isCurrencyColumn(header)) {
+
+    // 4. Money/Currency Input
+    // We check strict equality to avoid loose matching issues
+    if (fieldConfig.type === 'currency' || (fieldConfig.type === 'numeric' && fieldConfig.formatCurrency)) {
+        const formatCurrency = (val: string) => {
+            if (!val) return "";
+            // Remove non-numeric except comma/dot/minus
+            const clean = val.replace(/[^\d,\.-]/g, "");
+            if (!clean) return "";
+
+            // Try to parse standard JS float
+            // BR format: 1.000,00 -> remove dots, replace comma with dot
+            let normalized = clean;
+            if (clean.includes(',') && clean.includes('.')) {
+                normalized = clean.replace(/\./g, '').replace(',', '.');
+            } else if (clean.includes(',')) {
+                normalized = clean.replace(',', '.');
+            }
+
+            const floatVal = parseFloat(normalized);
+
+            if (isNaN(floatVal)) return val;
+
+            // Format to BRL style
+            return floatVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        const handleCurrencyBlur = (val: string) => {
+            const formatted = formatCurrency(val);
+            if (formatted !== val) {
+                updateCell(globalIndex, header, formatted);
+            }
+        };
+
+        // If the value stored is raw number (e.g. from JSON), format it for display
+        // If it's already formatted string, keep it.
+        // We try to format on render if it looks unformatted
+        let displayValue = value;
+        if (value && !String(value).includes(',') && !isNaN(parseFloat(String(value)))) {
+            displayValue = formatCurrency(String(value));
+        }
+
         return (
             <Input
                 className="h-8 w-full border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary/20 bg-transparent px-2 text-xs text-right font-mono min-w-[100px]"
-                value={value}
-                onChange={(e) => updateCell(globalIndex, header, e.target.value)}
+                defaultValue={displayValue} // Use defaultValue to allow editing
+                onBlur={(e) => handleCurrencyBlur(e.target.value)}
+                key={`${globalIndex}-${header}-${fieldConfig.type}`} // Force re-render on type change
             />
         );
     }
@@ -248,8 +295,17 @@ export function DataEditor() {
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const toast = useToast();
 
+    const [configVersion, setConfigVersion] = useState(0);
+
     useEffect(() => {
         setIsMounted(true);
+
+        const handleConfigChange = () => {
+            setConfigVersion(v => v + 1);
+        };
+
+        window.addEventListener('field-config-changed', handleConfigChange);
+        return () => window.removeEventListener('field-config-changed', handleConfigChange);
     }, []);
 
     useEffect(() => {
@@ -294,9 +350,8 @@ export function DataEditor() {
     const [filterValue, setFilterValue] = useState<string>("all");
     const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
+    const [visibleCount, setVisibleCount] = useState(10);
     const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-    const itemsPerPage = 10;
 
     // Computed Data
     const uniqueValues = useMemo(() => {
@@ -383,12 +438,11 @@ export function DataEditor() {
         return data;
     }, [fileData, searchTerm, filterColumn, filterValue, dateFilter, sortConfig]);
 
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-    const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const paginatedData = filteredData.slice(0, visibleCount);
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
-            const allIndices = new Set(paginatedData.map((_, idx) => (currentPage - 1) * itemsPerPage + idx));
+            const allIndices = new Set(paginatedData.map((_, idx) => idx));
             setSelectedRows(allIndices);
         } else {
             setSelectedRows(new Set());
@@ -513,6 +567,9 @@ export function DataEditor() {
                         Encerrar Edição
                     </Button>
                     <div className="w-[1px] h-6 bg-border mx-1" />
+
+                    <FieldConfiguration />
+
                     <Button variant="outline" className="h-9 gap-2" onClick={() => setIsWizardOpen(true)}>
                         <PlusCircle className="h-4 w-4" />
                         Novo Item
@@ -643,25 +700,27 @@ export function DataEditor() {
                                     />
                                 </TableHead>
                                 {headers.map((header) => {
-                                    const isNumeric = isCurrencyColumn(header);
+                                    const fieldConfig = getFieldConfig(header);
+                                    const isNumeric = fieldConfig.type === 'currency';
                                     const isStatus = header.toLowerCase() === "status";
 
                                     // Custom widths for headers
-                                    const isWide = isDropdownColumn(header) || isObservationColumn(header);
+                                    const isWide = fieldConfig.type === 'dropdown' || fieldConfig.type === 'textarea';
+                                    const config = getFieldConfig(header);
 
                                     return (
                                         <TableHead
                                             key={header}
                                             className={cn(
-                                                "h-9 font-semibold text-xs uppercase tracking-wider text-muted-foreground/80 cursor-pointer hover:text-foreground transition-colors select-none bg-transparent",
-                                                isNumeric && "text-right pr-6",
-                                                isStatus && "text-center",
-                                                isWide ? "min-w-[200px]" : "min-w-[120px]"
+                                                "min-w-[150px] px-2 py-3 text-xs font-semibold text-gray-700 select-none bg-transparent hover:bg-gray-100/50 transition-colors uppercase tracking-wider border-b-2 border-transparent hover:border-gray-200 cursor-pointer",
+                                                config.color ? config.color : "",
+                                                config.color ? "border-b-" + config.color.replace("bg-", "").replace("-100", "-300") : ""
                                             )}
                                             onClick={() => handleSort(header)}
                                         >
                                             <div className={cn("flex items-center gap-2", isNumeric && "justify-end", isStatus && "justify-center")}>
                                                 {header}
+                                                {/* Visual indicator for sort/color could go here */}
                                             </div>
                                         </TableHead>
                                     );
@@ -678,7 +737,7 @@ export function DataEditor() {
                                 </TableRow>
                             ) : (
                                 paginatedData.map((row, index) => {
-                                    const globalIndex = (currentPage - 1) * itemsPerPage + index;
+                                    const globalIndex = index;
                                     const isSelected = selectedRows.has(globalIndex);
                                     const isError = String(row["Status"]).toLowerCase() === "erro" || String(row["Status"]).toLowerCase() === "missing";
 
@@ -700,11 +759,20 @@ export function DataEditor() {
                                                     onCheckedChange={(c) => handleSelectRow(globalIndex, c === true)}
                                                 />
                                             </TableCell>
-                                            {headers.map((header, colIndex) => (
-                                                <TableCell key={`${globalIndex}-${header}`} className="py-1 h-9">
-                                                    {renderCell(header, row, index, globalIndex, colIndex)}
-                                                </TableCell>
-                                            ))}
+                                            {headers.map((header, colIndex) => {
+                                                const config = getFieldConfig(header);
+                                                return (
+                                                    <TableCell
+                                                        key={`${globalIndex}-${header}`}
+                                                        className={cn(
+                                                            "py-1 h-9 border-r border-transparent",
+                                                            config.color ? config.color.replace("100", "100/30") : ""
+                                                        )}
+                                                    >
+                                                        {renderCell(header, row, index, globalIndex, colIndex)}
+                                                    </TableCell>
+                                                );
+                                            })}
                                             <TableCell className="text-right pr-4 py-1 h-9">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity items-center">
                                                     {String(row["Status"]).toLowerCase() === "aprovado" ? (
@@ -746,59 +814,35 @@ export function DataEditor() {
                     </Table>
                 </div>
 
-                {/* Footer / Pagination */}
-                <div className="flex items-center justify-between border-t p-2 text-sm text-muted-foreground bg-white z-20 shrink-0">
+                {/* Footer / Load More */}
+                <div className="flex items-center justify-between border-t p-2 text-sm text-muted-foreground bg-white z-20 shrink-0 safe-area-bottom">
                     <div>
-                        Mostrando <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> a <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> de <span className="font-medium">{filteredData.length}</span> resultados
+                        Mostrando <span className="font-medium">{paginatedData.length}</span> de <span className="font-medium">{filteredData.length}</span> resultados
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                            className="h-8 w-8"
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <div className="flex items-center gap-1">
-                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                let p = currentPage;
-                                if (totalPages <= 5) {
-                                    p = i + 1;
-                                } else if (currentPage <= 3) {
-                                    p = i + 1;
-                                } else if (currentPage >= totalPages - 2) {
-                                    p = totalPages - 4 + i;
-                                } else {
-                                    p = currentPage - 2 + i;
-                                }
+                        {visibleCount > 10 && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setVisibleCount(10)}
+                                className="h-8 gap-2 text-xs"
+                            >
+                                <ChevronUp className="h-3.5 w-3.5" />
+                                Recolher
+                            </Button>
+                        )}
 
-                                // Safety check
-                                if (p < 1 || p > totalPages) return null;
-
-                                return (
-                                    <Button
-                                        key={p}
-                                        variant={p === currentPage ? "default" : "ghost"}
-                                        size="sm"
-                                        className={cn("h-8 w-8 text-xs", p === currentPage ? "bg-primary text-primary-foreground hover:bg-primary/90" : "")}
-                                        onClick={() => setCurrentPage(p)}
-                                    >
-                                        {p}
-                                    </Button>
-                                );
-                            })}
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages}
-                            className="h-8 w-8"
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
+                        {visibleCount < filteredData.length && (
+                            <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => setVisibleCount(prev => prev + 10)}
+                                className="h-8 gap-2 text-xs bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                                Ver mais 10
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>

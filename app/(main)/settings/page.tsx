@@ -2,28 +2,16 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
+
 
 export default function SettingsPage() {
     const [responsibles, setResponsibles] = useState<string[]>([]);
     const [statusList, setStatusList] = useState<string[]>([]);
     const [newResponsible, setNewResponsible] = useState("");
     const [isLoading, setIsLoading] = useState(true);
-
-    // Fetch settings on load
-    useEffect(() => {
-        fetch('/api/settings')
-            .then(res => res.json())
-            .then(data => {
-                setResponsibles(data.responsibles || []);
-                setStatusList(data.status || []);
-                setIsLoading(false);
-            })
-            .catch(err => console.error(err));
-    }, []);
 
     const saveSettings = async (newResponsibles: string[], newStatus: string[]) => {
         await fetch('/api/settings', {
@@ -51,14 +39,17 @@ export default function SettingsPage() {
     if (isLoading) return <div>Carregando configurações...</div>;
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6 p-6">
             <div>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">Configurações</h1>
                 <p className="text-sm text-muted-foreground">
-                    Gerencie responsáveis, status e preferências do sistema.
+                    Gerencie responsáveis, status e configurações de campos.
                 </p>
             </div>
             <Separator />
+
+            {/* Field Configuration Section Removed - Moved to Editor */}
+
 
             <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-6">
