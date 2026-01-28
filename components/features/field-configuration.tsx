@@ -184,9 +184,9 @@ export function FieldConfiguration() {
     return (
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
-                <Button variant="outline" className="h-9 gap-2 bg-gradient-to-r from-indigo-50 to-white border-indigo-100 hover:border-indigo-300 text-indigo-700 shadow-sm transition-all">
-                    <Settings2 className="h-4 w-4" />
-                    <span className="hidden sm:inline font-medium">Configurar Campos</span>
+                <Button variant="secondary" className="h-8 gap-2 shadow-xs transition-all text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-primary">
+                    <Settings2 className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Configurar Campos</span>
                 </Button>
             </SheetTrigger>
             <SheetContent className="w-full sm:max-w-[500px] sm:w-[500px] flex flex-col p-0 gap-0 border-l shadow-2xl">

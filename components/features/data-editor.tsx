@@ -10,6 +10,15 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -499,6 +508,38 @@ export function DataEditor() {
         }
     };
 
+    // --- Bulk Edit Logic ---
+    const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+    const [bulkEditColumn, setBulkEditColumn] = useState<string>("");
+    const [bulkEditValue, setBulkEditValue] = useState<string>("");
+
+    const handleBulkEdit = () => {
+        if (!bulkEditColumn || !bulkEditValue) return;
+
+        const indices = Array.from(selectedRows);
+        const { fileData: currentData, setFileData, headers, fileName, fileId } = useAppStore.getState();
+        if (!currentData) return;
+
+        const newData = [...currentData];
+        let updatedCount = 0;
+
+        indices.forEach(idx => {
+            if (newData[idx]) {
+                const globalIdx = idx; // paginatedData mapped to global index correctly via selectedRows logic
+                newData[globalIdx] = { ...newData[globalIdx], [bulkEditColumn]: bulkEditValue };
+                updatedCount++;
+            }
+        });
+
+        setFileData(newData, headers, fileName!, fileId);
+        setIsBulkEditOpen(false);
+        setBulkEditColumn("");
+        setBulkEditValue("");
+        setSelectedRows(new Set()); // Deselect after edit
+
+        toast.success("Edição em massa concluída", `${updatedCount} itens foram atualizados com sucesso.`);
+    };
+
     const handleExport = () => {
         if (!fileData || fileData.length === 0) return;
         const worksheet = XLSX.utils.json_to_sheet(fileData);
@@ -550,31 +591,38 @@ export function DataEditor() {
                 <div className="space-y-1">
                     <div className="flex items-center gap-3">
                         <h1 className="text-xl font-bold tracking-tight">Editor de Dados</h1>
+                        {fileName && (
+                            <div className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase text-amber-700 shrink-0">
+                                {fileName.replace("lançamentos contábeis de ", "").replace(".xlsx", "").replace(".csv", "")}
+                            </div>
+                        )}
                         {errorCount > 0 && (
                             <div className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 ring-1 ring-inset ring-red-600/10">
                                 <AlertCircle className="h-3 w-3" />
-                                {errorCount} erros encontrados
+                                {errorCount}
                             </div>
                         )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                        Gerencie lançamentos contábeis de {fileName ? fileName.replace("lançamentos contábeis de ", "") : format(new Date(), "MMMM/yyyy", { locale: ptBR })}
-                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                        <Button
+                            variant="default"
+                            className="h-8 gap-2 shadow-xs transition-all text-xs font-medium bg-[#FF8C00] hover:bg-[#FF8C00]/90 text-white border-transparent"
+                            onClick={() => setIsWizardOpen(true)}
+                        >
+                            <PlusCircle className="h-3.5 w-3.5" />
+                            Novo Item
+                        </Button>
+                    </div>
+
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" className="h-9 gap-2 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={handleExit}>
                         <X className="h-4 w-4" />
                         Encerrar Edição
                     </Button>
-                    <div className="w-[1px] h-6 bg-border mx-1" />
+                    <div className="w-[1px] h-6 bg-border mx-1 hidden md:block" />
 
-                    <FieldConfiguration />
-
-                    <Button variant="outline" className="h-9 gap-2" onClick={() => setIsWizardOpen(true)}>
-                        <PlusCircle className="h-4 w-4" />
-                        Novo Item
-                    </Button>
-                    <Button variant="outline" className="h-9 gap-2" onClick={handleExport}>
+                    <Button variant="outline" className="h-9 gap-2 hidden md:flex" onClick={handleExport}>
                         <Download className="h-4 w-4" />
                         Exportar Sheets
                     </Button>
@@ -684,6 +732,7 @@ export function DataEditor() {
                 </div>
             </div>
 
+
             {/* Table Section */}
             <div className="rounded-lg border bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
                 <div
@@ -713,8 +762,8 @@ export function DataEditor() {
                                             key={header}
                                             className={cn(
                                                 "min-w-[150px] px-2 py-3 text-xs font-semibold text-gray-700 select-none bg-transparent hover:bg-gray-100/50 transition-colors uppercase tracking-wider border-b-2 border-transparent hover:border-gray-200 cursor-pointer",
-                                                config.color ? config.color : "",
-                                                config.color ? "border-b-" + config.color.replace("bg-", "").replace("-100", "-300") : ""
+                                                config.color || "",
+                                                config.color ? "border-b-gray-300" : ""
                                             )}
                                             onClick={() => handleSort(header)}
                                         >
@@ -766,7 +815,7 @@ export function DataEditor() {
                                                         key={`${globalIndex}-${header}`}
                                                         className={cn(
                                                             "py-1 h-9 border-r border-transparent",
-                                                            config.color ? config.color.replace("100", "100/30") : ""
+                                                            config.color || ""
                                                         )}
                                                     >
                                                         {renderCell(header, row, index, globalIndex, colIndex)}
@@ -820,6 +869,8 @@ export function DataEditor() {
                         Mostrando <span className="font-medium">{paginatedData.length}</span> de <span className="font-medium">{filteredData.length}</span> resultados
                     </div>
                     <div className="flex items-center gap-2">
+                        <FieldConfiguration />
+
                         {visibleCount > 10 && (
                             <Button
                                 variant="outline"
@@ -837,11 +888,77 @@ export function DataEditor() {
                                 variant="default"
                                 size="sm"
                                 onClick={() => setVisibleCount(prev => prev + 10)}
-                                className="h-8 gap-2 text-xs bg-indigo-600 hover:bg-indigo-700"
+                                className="h-8 gap-2 text-xs bg-primary hover:bg-primary/90"
                             >
                                 <ChevronDown className="h-3.5 w-3.5" />
                                 Ver mais 10
                             </Button>
+                        )}
+
+                        {selectedRows.size > 0 && (
+                            <Dialog open={isBulkEditOpen} onOpenChange={setIsBulkEditOpen}>
+                                <DialogTrigger asChild>
+                                    <Button variant="secondary" size="sm" className="h-8 gap-2 text-xs border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+                                        <Pencil className="h-3.5 w-3.5" />
+                                        Editar {selectedRows.size} itens
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px]">
+                                    <DialogHeader>
+                                        <DialogTitle>Edição em Massa</DialogTitle>
+                                        <DialogDescription>
+                                            Atualize simultaneamente {selectedRows.size} registros selecionados.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="grid gap-6 py-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                Selecione a Coluna
+                                            </label>
+                                            <Select value={bulkEditColumn} onValueChange={setBulkEditColumn}>
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Escolha um campo para editar..." />
+                                                </SelectTrigger>
+                                                <SelectContent className="max-h-[300px]">
+                                                    {headers.map(h => (
+                                                        <SelectItem key={h} value={h}>{h}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {bulkEditColumn && (
+                                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                    Novo Valor
+                                                </label>
+                                                <Select value={bulkEditValue} onValueChange={setBulkEditValue}>
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue placeholder="Selecione o novo valor..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="max-h-[300px]">
+                                                        {allUniqueValues[bulkEditColumn]?.map(val => (
+                                                            <SelectItem key={val} value={val}>{val}</SelectItem>
+                                                        ))}
+                                                        {!allUniqueValues[bulkEditColumn]?.includes(bulkEditValue) && bulkEditValue && (
+                                                            <SelectItem value={bulkEditValue}>{bulkEditValue}</SelectItem>
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                <p className="text-[11px] text-muted-foreground pt-1">
+                                                    Isso substituirá o valor atual em todos os itens selecionados.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                        <Button variant="ghost" onClick={() => setIsBulkEditOpen(false)}>Cancelar</Button>
+                                        <Button onClick={handleBulkEdit} disabled={!bulkEditColumn || !bulkEditValue}>
+                                            Aplicar Alterações
+                                        </Button>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
                         )}
                     </div>
                 </div>
