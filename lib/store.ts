@@ -22,6 +22,8 @@ interface AppState {
   comments: Record<string, Comment[]>;
   setFileData: (data: DataRow[], headers: string[], fileName: string, fileId?: string | null) => void;
   updateCell: (rowIndex: number, column: string, value: string | number) => void;
+  addRow: (row: DataRow) => void;
+  deleteRow: (rowIndex: number) => void;
   addComment: (caseId: string, text: string, user: string) => void;
   clearData: () => void;
   isSidebarOpen: boolean;
@@ -42,6 +44,16 @@ export const useAppStore = create<AppState>()(
           const newData = [...state.fileData];
           newData[rowIndex] = { ...newData[rowIndex], [column]: value };
           return { fileData: newData };
+        }),
+      addRow: (row) =>
+        set((state) => ({
+          fileData: [row, ...state.fileData], // Add to top
+        })),
+    deleteRow: (rowIndex) =>
+        set((state) => {
+            const newData = [...state.fileData];
+            newData.splice(rowIndex, 1);
+            return { fileData: newData };
         }),
       addComment: (caseId, text, user) =>
         set((state) => {

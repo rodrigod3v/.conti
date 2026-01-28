@@ -30,11 +30,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
             <main
                 className={cn(
-                    "min-h-screen p-8 transition-all duration-300 ease-in-out",
+                    "min-h-screen transition-all duration-300 ease-in-out flex flex-col",
                     isSidebarOpen ? "sm:ml-48" : "ml-0"
                 )}
             >
-                <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex-1 animate-in fade-in slide-in-from-bottom-4 duration-700 w-full">
                     {children}
                 </div>
             </main>

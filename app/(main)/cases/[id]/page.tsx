@@ -59,7 +59,7 @@ import { useMemo, useState, useEffect } from "react";
 export default function CaseDetailsPage() {
     const params = useParams();
     const caseId = decodeURIComponent(params.id as string);
-    const { fileData, updateCell, comments, addComment } = useAppStore();
+    const { fileData, headers, updateCell, comments, addComment } = useAppStore();
     const [isEditOpen, setIsEditOpen] = useState(false);
 
     // Comment State
@@ -87,8 +87,17 @@ export default function CaseDetailsPage() {
         };
 
         const rowIndex = fileData.findIndex(r => {
+            // Priority 1: Check known ID columns
             const id = getValue(r, "Caso", "Chamado", "caso", "chamado");
-            return String(id) === caseId;
+            if (id && String(id) === caseId) return true;
+
+            // Priority 2: Check the FIRST column (often the ID in spreadsheets)
+            if (headers.length > 0) {
+                const firstColValue = r[headers[0]];
+                if (firstColValue && String(firstColValue) === caseId) return true;
+            }
+
+            return false;
         });
 
         if (rowIndex === -1) return null;

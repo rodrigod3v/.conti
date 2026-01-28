@@ -38,12 +38,14 @@ import {
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
-    X
+    X,
+    PlusCircle
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
+import { NewCaseWizard } from "@/components/features/new-case-wizard";
 
 // --- Helper Components ---
 
@@ -238,10 +240,11 @@ const EditableCell = ({
 
 export function DataEditor() {
     // ... (DataEditor START) ...
-    const { fileData, headers, fileName, updateCell, setFileData, clearData } = useAppStore();
+    const { fileData, headers, fileName, updateCell, setFileData, clearData, deleteRow } = useAppStore();
     const [isSaving, setIsSaving] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [isMounted, setIsMounted] = useState(false);
+    const [isWizardOpen, setIsWizardOpen] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
@@ -402,7 +405,7 @@ export function DataEditor() {
     };
 
     const handleSave = async () => {
-        const { fileId } = useAppStore.getState();
+        const { fileId, fileData: currentFileData } = useAppStore.getState();
         if (!fileId) {
             alert("Erro: ID do arquivo não encontrado. Salve novamente ou reabra o arquivo.");
             return;
@@ -412,10 +415,16 @@ export function DataEditor() {
             const response = await fetch(`/api/files/${fileId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rows: fileData })
+                body: JSON.stringify({ rows: currentFileData })
             });
             if (!response.ok) throw new Error("Falha ao salvar");
-            alert("Alterações salvas com sucesso!");
+
+            // Offer to download the updated file immediately
+            if (confirm("Alterações salvas na plataforma com sucesso!\n\nDeseja baixar uma cópia atualizada da planilha para o seu computador agora?")) {
+                handleExport();
+            } else {
+                alert("Alterações salvas! Lembre-se de usar o botão 'Exportar' se precisar do arquivo atualizado em seu computador.");
+            }
         } catch (error) {
             console.error("Erro ao salvar:", error);
             alert("Erro ao salvar alterações no banco de dados.");
@@ -492,6 +501,10 @@ export function DataEditor() {
                         Encerrar Edição
                     </Button>
                     <div className="w-[1px] h-6 bg-border mx-1" />
+                    <Button variant="outline" className="h-9 gap-2" onClick={() => setIsWizardOpen(true)}>
+                        <PlusCircle className="h-4 w-4" />
+                        Novo Item
+                    </Button>
                     <Button variant="outline" className="h-9 gap-2" onClick={handleExport}>
                         <Download className="h-4 w-4" />
                         Exportar Sheets
@@ -512,6 +525,8 @@ export function DataEditor() {
                     </Button>
                 </div>
             </div>
+
+            <NewCaseWizard open={isWizardOpen} onOpenChange={setIsWizardOpen} />
 
             {/* Filters Section */}
             <div className="flex flex-col gap-3 rounded-lg border bg-card p-2 md:flex-row md:items-center bg-white shrink-0">
@@ -679,13 +694,29 @@ export function DataEditor() {
                                                 </TableCell>
                                             ))}
                                             <TableCell className="text-right pr-4 py-1 h-9">
-                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity items-center">
                                                     {String(row["Status"]).toLowerCase() === "aprovado" ? (
                                                         <Check className="h-4 w-4 text-emerald-600" />
                                                     ) : (
-                                                        <Link href={`/cases/${row["Chamado"] || row["chamado"] || row["Caso"] || row["caso"]}`}>
-                                                            <Pencil className="h-4 w-4 text-muted-foreground cursor-pointer hover:text-accent-foreground" />
-                                                        </Link>
+                                                        <div className="flex items-center gap-1">
+                                                            <Link href={`/cases/${row["Chamado"] || row["chamado"] || row["Caso"] || row["caso"]}`}>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-blue-600">
+                                                                    <Pencil className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </Link>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                                                                onClick={() => {
+                                                                    if (confirm("Tem certeza que deseja excluir esta linha?")) {
+                                                                        deleteRow(globalIndex);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </TableCell>

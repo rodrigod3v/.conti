@@ -191,7 +191,7 @@ export default function Home() {
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 p-8 max-w-7xl mx-auto">
             {/* Header Section */}
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                 <div>
