@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export interface DataRow {
   [key: string]: string | number | null;
@@ -27,41 +28,49 @@ interface AppState {
   toggleSidebar: () => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  fileData: [],
-  headers: [],
-  fileName: null,
-  fileId: null,
-  comments: {},
-  setFileData: (data, headers, fileName, fileId = null) => set({ fileData: data, headers, fileName, fileId }),
-  updateCell: (rowIndex, column, value) =>
-    set((state) => {
-      const newData = [...state.fileData];
-      newData[rowIndex] = { ...newData[rowIndex], [column]: value };
-      return { fileData: newData };
-    }),
-  addComment: (caseId, text, user) =>
-    set((state) => {
-      const newComments = { ...state.comments };
-      if (!newComments[caseId]) {
-        newComments[caseId] = [];
-      }
-      
-      const now = new Date();
-      const timeString = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      fileData: [],
+      headers: [],
+      fileName: null,
+      fileId: null,
+      comments: {},
+      setFileData: (data, headers, fileName, fileId = null) => set({ fileData: data, headers, fileName, fileId }),
+      updateCell: (rowIndex, column, value) =>
+        set((state) => {
+          const newData = [...state.fileData];
+          newData[rowIndex] = { ...newData[rowIndex], [column]: value };
+          return { fileData: newData };
+        }),
+      addComment: (caseId, text, user) =>
+        set((state) => {
+          const newComments = { ...state.comments };
+          if (!newComments[caseId]) {
+            newComments[caseId] = [];
+          }
+          
+          const now = new Date();
+          const timeString = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-      newComments[caseId].push({
-        id: Math.random().toString(36).substr(2, 9),
-        text,
-        user,
-        timestamp: timeString,
-        avatarSeed: user,
-        isReply: false // Default to false for new top-level comments
-      });
-      
-      return { comments: newComments };
+          newComments[caseId].push({
+            id: Math.random().toString(36).substr(2, 9),
+            text,
+            user,
+            timestamp: timeString,
+            avatarSeed: user,
+            isReply: false // Default to false for new top-level comments
+          });
+          
+          return { comments: newComments };
+        }),
+      clearData: () => set({ fileData: [], headers: [], fileName: null, fileId: null, comments: {} }),
+      isSidebarOpen: true,
+      toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
     }),
-  clearData: () => set({ fileData: [], headers: [], fileName: null, fileId: null, comments: {} }),
-  isSidebarOpen: true,
-  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-}));
+    {
+      name: 'conti-storage', // unique name
+      storage: createJSONStorage(() => localStorage),
+    }
+  )
+);

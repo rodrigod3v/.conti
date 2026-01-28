@@ -37,10 +37,12 @@ import {
     ListFilter,
     ArrowUpDown,
     ArrowUp,
-    ArrowDown
+    ArrowDown,
+    X
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 
 // --- Helper Components ---
@@ -236,9 +238,14 @@ const EditableCell = ({
 
 export function DataEditor() {
     // ... (DataEditor START) ...
-    const { fileData, headers, fileName, updateCell, setFileData } = useAppStore();
+    const { fileData, headers, fileName, updateCell, setFileData, clearData } = useAppStore();
     const [isSaving, setIsSaving] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     useEffect(() => {
         const container = tableContainerRef.current;
@@ -254,6 +261,22 @@ export function DataEditor() {
         container.addEventListener('wheel', handleWheel, { passive: false });
         return () => container.removeEventListener('wheel', handleWheel);
     }, []);
+
+    // Redirect to Home if no file data (after hydration)
+    const router = useRouter();
+
+    useEffect(() => {
+        if (isMounted && (!fileData || fileData.length === 0)) {
+            router.push("/");
+        }
+    }, [fileData, router, isMounted]);
+
+    const handleExit = () => {
+        if (confirm("Tem certeza que deseja encerrar a edição? Os dados não salvos serão perdidos da visualização.")) {
+            clearData();
+            router.push("/");
+        }
+    };
 
     // Local state for UI
     const [searchTerm, setSearchTerm] = useState("");
@@ -464,6 +487,11 @@ export function DataEditor() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button variant="ghost" className="h-9 gap-2 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={handleExit}>
+                        <X className="h-4 w-4" />
+                        Encerrar Edição
+                    </Button>
+                    <div className="w-[1px] h-6 bg-border mx-1" />
                     <Button variant="outline" className="h-9 gap-2" onClick={handleExport}>
                         <Download className="h-4 w-4" />
                         Exportar Sheets

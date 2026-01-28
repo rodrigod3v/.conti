@@ -1,116 +1,72 @@
 # Sistema de Controle Contábil (Accounting Control System)
 
-Uma plataforma moderna e robusta para gestão, validação e análise de dados contábeis. Projetada para automatizar a importação de planilhas complexas, normalizar inconsistências e fornecer insights visuais imediatos para equipes financeiras.
+Uma plataforma moderna para gestão, validação e análise de dados contábeis. Projetada para automatizar a importação de planilhas complexas, normalizar inconsistências e fornecer insights visuais imediatos.
 
-## 🚀 Visão Geral
+## 🚀 Novidades da Versão Atual
 
-O **Sistema de Controle Contábil** resolve o desafio de consolidar dados de diversas fontes (Excel, CSV) em um formato padronizado. Ele atua como uma camada de inteligência entre os dados brutos e o operador, oferecendo:
+### 1. Ingestão Dinâmica & Inteligente
+- **Schema Flexível**: O sistema agora se adapta automaticamente às colunas da sua planilha. Não exige mais templates rígidos.
+- **Detecção Inteligente**:
+  - **Categorias**: Colunas como "Status", "Cliente", "Fornecedor" viram Dropdowns automaticamente.
+  - **Datas**: Converte formatações diversas (Excel Serial, Strings) para `dd/mm/yyyy`.
+  - **Moedas**: Identifica colunas financeiras ("Valor", "Líquido") e formata como BRL.
+- **Normalização**: Remove espaços extras e corrige variações de maiúsculas/minúsculas.
 
-1.  **Ingestão Inteligente**: Algoritmos de normalização que mapeiam automaticamente colunas variadas (ex: "Data", "Dt. Lançamento", "Data Venc.") para um schema unificado.
-2.  **Gestão de Inconsistências**: Identificação automática de erros ou pendências nos registros importados.
-3.  **Visualização Avançada**: Dashboard com KPIs, gráficos de status e painéis de casos urgentes.
-4.  **Edição em Massa**: Uma interface de "Data Grid" poderosa para correção rápida de registros diretamente no navegador.
+### 2. Editor de Dados (Data Grid)
+- **Compacto & Responsivo**: A tabela se ajusta à altura da tela, evitando barra de rolagem na página inteira.
+- **Edição Avançada**:
+  - **Observações**: Campos de texto longo abrem em painéis confortáveis para leitura e edição.
+  - **Dropdowns Dinâmicos**: As opções são geradas baseadas nos valores únicos encontrados na coluna.
+- **Links Automáticos**: IDs detectados viram links diretos para a página de detalhes.
+
+### 3. Página de Detalhes do Caso
+- **Visual Limpo**: Exibe apenas os campos que possuem valor, removendo nulos ou vazios.
+- **Organização**: Cards retráteis para "Financeiro", "Informações Gerais" e "Outros Detalhes".
+- **Foco no Conteúdo**: Título simplificado mostrando apenas o ID e Nome relevante do item.
+
+---
 
 ## 🛠️ Tech Stack
 
-O projeto utiliza as tecnologias mais recentes do ecossistema React/Next.js para garantir performance, tipagem estática e facilidade de manutenção.
-
--   **Framework**: [Next.js 16](https://nextjs.org/) (App Router & Turbopack)
--   **Linguagem**: [TypeScript](https://www.typescriptlang.org/)
--   **Estilização**: [Tailwind CSS v4](https://tailwindcss.com/) & [Shadcn/UI](https://ui.shadcn.com/)
--   **Banco de Dados**: [SQLite](https://www.sqlite.org/) (Portátil e eficiente para o escopo)
--   **ORM**: [Prisma](https://www.prisma.io/) (Tipagem segura de banco de dados)
--   **Processamento de Arquivos**: [SheetJS (xlsx)](https://docs.sheetjs.com/) para parsing de planilhas.
--   **Gerenciamento de Estado**: [Zustand](https://github.com/pmndrs/zustand)
--   **Visualização de Dados**: [Recharts](https://recharts.org/)
-
-## ⚡ Funcionalidades Principais
-
-### 1. Upload e Normalização
--   Importação "Drag & Drop" de arquivos `.xlsx` e `.csv`.
--   Algorítimo fuzzy para detecção de colunas (Ex: reconhece "Vlr Liq" e "Valor Liquido" como a mesma entidade).
--   Conversão automática de datas do formato Serial Excel para JS Date.
--   Inserção em **Lote (Batch)** para alta performance com arquivos grandes (5000+ linhas).
-
-### 2. Dashboard Analítico
--   Cards de KPI: Total de Casos, Inconsistências, Valor Total.
--   Gráficos interativos de Status dos Chamados.
--   Histórico recente de arquivos importados.
-
-### 3. Editor de Dados (Data Grid)
--   Visualização tabular de alta densidade.
--   Edição inline de células.
--   Filtros e ordenação.
+- **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
+- **Linguagem**: TypeScript
+- **Estilização**: Tailwind CSS v4 & Shadcn/UI
+- **Estado**: Zustand (Store Global)
+- **Processamento**: SheetJS (Excel Parsing)
 
 ## 📂 Estrutura do Projeto
 
 ```bash
 .
 ├── app/
-│   ├── api/            # Rotas de API (Next.js server-less functions)
-│   ├── (dashboard)/    # Layouts autenticados/protegidos
-│   ├── editor/         # Interface de edição de dados
-│   └── page.tsx        # Home / Landing de Upload
+│   ├── (auth)/         # Login e Autenticação
+│   ├── (setup)/        # Fluxo de Primeiro Acesso (Perfil)
+│   ├── (main)/         # Dashboard, Editor, Detalhes
+│   └── layout.tsx      # Root Layout
 ├── components/
-│   ├── features/       # Componentes de negócio (UploadZone, QuickNav, Charts)
-│   └── ui/             # Componentes de design system (Botões, Modais - Shadcn)
+│   ├── features/       # DataEditor, Cards, UploadZone
+│   └── ui/             # Componentes Shadcn (Button, Card, Input...)
 ├── lib/
-│   ├── prisma.ts       # Cliente do banco de dados (Singleton)
-│   ├── store.ts        # Gerenciamento de estado global (Zustand)
-│   └── utils.ts        # Funções auxiliares
-├── prisma/
-│   ├── schema.prisma   # Definição do banco de dados
-│   └── dev.db          # Arquivo do banco de dados (SQLite)
-└── scripts/            # Scripts de automação de deploy
+│   ├── column-utils.ts # Lógica centralizada de tipos de coluna
+│   └── store.ts        # Gerenciamento de estado (Zustand)
+└── public/             # Assets estáticos
 ```
 
 ## 🔧 Como Rodar Localmente
 
-### Pré-requisitos
--   Node.js 20+
--   npm ou yarn
-
-### Instalação
-
-1.  Clone o repositório e instale as dependências:
+1.  **Instale as dependências**:
     ```bash
     npm install
-    # Importante: Isso instalará automaticamente o 'next-themes' e outras dependências críticas.
     ```
 
-2.  Configure o banco de dados:
-    ```bash
-    # Gera o cliente Prisma e cria o arquivo do banco dev.db
-    npx prisma migrate dev --name init
-    # OU apenas sincronize sem criar migrações
-    npx prisma db push
-    ```
-
-3.  Inicie o servidor de desenvolvimento:
+2.  **Inicie o servidor**:
     ```bash
     npm run dev
     ```
 
-4.  Acesse `http://localhost:3000`
+3.  **Acesse**: `http://localhost:3000`
 
-## 🚢 Deploy e Produção
+## 🤝 Desenvolvimento
 
-O projeto conta com scripts automatizados para empacotamento e deploy em ambientes Linux (Ubuntu/VMs).
-
-Consulte o arquivo [DEPLOY.md](./DEPLOY.md) para o guia completo passo-a-passo.
-
-Resumo dos comandos de deploy:
-```powershell
-# 1. Build e Empacotamento (PowerShell)
-.\scripts\package_deploy.ps1
-
-# 2. Envio e Execução (Exemplo)
-scp deploy.zip usuario@ip:~/
-ssh usuario@ip "bash finalize_deploy.sh"
-```
-
-## 🤝 Contribuição
-
-1.  Siga o padrão de commits.
-2.  Mantenha o schema do Prisma atualizado.
-3.  Utilize componentes do diretório `components/ui` para manter a consistência visual.
+- **Padronização**: Toda a lógica de detecção de colunas reside em `lib/column-utils.ts`.
+- **Layouts**: Utilizamos `h-screen` e `flex` para garantir que a aplicação se comporte como um software desktop.
