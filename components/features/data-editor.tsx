@@ -52,7 +52,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { NewCaseWizard } from "@/components/features/new-case-wizard";
 import { useToast } from "@/components/ui/simple-toast";
 
@@ -540,14 +540,38 @@ export function DataEditor() {
         toast.success("Edição em massa concluída", `${updatedCount} itens foram atualizados com sucesso.`);
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
         if (!fileData || fileData.length === 0) return;
-        const worksheet = XLSX.utils.json_to_sheet(fileData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Dados");
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Dados");
+
+        // Add headers
+        if (headers && headers.length > 0) {
+            worksheet.columns = headers.map(header => ({
+                header: header,
+                key: header,
+                width: 15
+            }));
+        }
+
+        // Add data rows
+        fileData.forEach(row => {
+            worksheet.addRow(row);
+        });
+
+        // Generate file
         const exportName = fileName ? `${fileName.replace(/\.[^/.]+$/, "")}_editado.xlsx` : "dados_exportados.xlsx";
-        XLSX.writeFile(workbook, exportName);
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = exportName;
+        link.click();
+        window.URL.revokeObjectURL(url);
     };
+
 
 
 
