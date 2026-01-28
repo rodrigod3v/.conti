@@ -263,7 +263,7 @@ export function DataEditor() {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-    const itemsPerPage = 15;
+    const itemsPerPage = 10;
 
     // Computed Data
     const uniqueValues = useMemo(() => {
@@ -446,7 +446,7 @@ export function DataEditor() {
     if (!fileData) return null;
 
     return (
-        <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
+        <div className="flex flex-col gap-4 max-h-[calc(100vh-6rem)] h-full">
             {/* Header Section */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
                 <div className="space-y-1">

@@ -46,19 +46,24 @@ const Collapsible = React.forwardRef<HTMLDivElement, CollapsibleProps>(
 )
 Collapsible.displayName = "Collapsible"
 
+import { Slot } from "@radix-ui/react-slot"
+
+// ... (Collapsible implementation)
+
 const CollapsibleTrigger = React.forwardRef<
     HTMLButtonElement,
-    React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ className, children, ...props }, ref) => {
+    React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }
+>(({ className, children, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
     return (
-        <button
+        <Comp
             ref={ref}
             type="button"
             className={className}
             {...props}
         >
             {children}
-        </button>
+        </Comp>
     )
 })
 CollapsibleTrigger.displayName = "CollapsibleTrigger"

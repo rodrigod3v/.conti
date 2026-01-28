@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -129,26 +131,25 @@ export default function CaseDetailsPage() {
             id: String(getValue(row, "Caso", "Chamado", "caso", "chamado") || caseId),
             title: getValue(row, "Inconsistencias", "inconsistencias", "Descrição", "descricao")
                 ? "Inconsistência Identificada"
-                : "Lançamento Contábil",
-            description: String(getValue(row, descriptionField) || "Nenhuma inconsistência relatada para este lançamento."),
+                : String(getValue(row, "Caso", "Chamado", "caso", "chamado") || caseId),
+            description: String(getValue(row, descriptionField) || ""),
             descriptionField,
             status: status,
 
-            // General Info
-            client: String(getValue(row, "Empresa", "empresa", "Cliente", "cliente") || getValue(row, "Nome do Fornecedor", "Fornecedor") || "N/A"),
-            responsible: String(getValue(row, "Responsável", "responsavel", "Usuario", "usuario", "Area Responsavel") || "Não atribuído"),
+            // General Info - ONLY render if they exist
+            client: String(getValue(row, "Empresa", "empresa", "Cliente", "cliente") || getValue(row, "Nome do Fornecedor", "Fornecedor") || ""),
+            responsible: String(getValue(row, "Responsável", "responsavel", "Usuario", "usuario", "Area Responsavel") || ""),
             priority: status.toLowerCase() === "erro" || status.toLowerCase() === "alto" ? "Alta" : "Normal",
-            period: getValue(row, "Exercicio", "exercicio", "Periodo", "periodo") ? `Exercício ${getValue(row, "Exercicio", "exercicio")}` : "2023",
-            lastUpdate: "Há 2 horas", // Mock
+            period: getValue(row, "Exercicio", "exercicio", "Periodo", "periodo") ? `Exercício ${getValue(row, "Exercicio", "exercicio")}` : "",
 
             // Dates
-            openedAt: String(getValue(row, "Data", "data", "Data Abertura") || "-"),
-            dueDate: String(getValue(row, "Data Vencimento", "vencimento") || "-"),
+            openedAt: String(getValue(row, "Data", "data", "Data Abertura") || ""),
+            dueDate: String(getValue(row, "Data Vencimento", "vencimento") || ""),
 
             // Financial
             value: getValue(row, "Valor (R$)", "Valor", "montante"),
             netValue: getValue(row, "Valor Liquido", "valor liquido"),
-            paymentMethod: String(getValue(row, "Forma de Pagamento", "forma pagamento", "Forma Pagto", "Metodo Pagamento") || "-"),
+            paymentMethod: String(getValue(row, "Forma de Pagamento", "forma pagamento", "Forma Pagto", "Metodo Pagamento") || ""),
             pcc: getValue(row, "PCC", "pcc"),
             ir: getValue(row, "IR", "ir", "IRRF", "Imposto de Renda"),
             issBase: getValue(row, "Base ISS", "base iss"),
@@ -259,7 +260,7 @@ export default function CaseDetailsPage() {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
                     <Link href="/editor" className="hover:text-primary transition-colors">Casos</Link>
                     <span>/</span>
-                    <span className="text-foreground font-medium">Caso #{caseData.id}</span>
+                    <span className="text-foreground font-medium">{caseData.id}</span>
                 </div>
 
                 {/* Header */}
@@ -267,7 +268,7 @@ export default function CaseDetailsPage() {
                     <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                             <h1 className="text-2xl font-black tracking-tight text-foreground">
-                                Caso #{caseData.id}: {caseData.title}
+                                {caseData.title}
                             </h1>
                             <Badge className={cn(
                                 "px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border-none",
@@ -578,87 +579,42 @@ export default function CaseDetailsPage() {
                 <div className="flex flex-col lg:flex-row gap-6 mt-6">
                     {/* Main Content */}
                     <div className="flex-1 space-y-8">
-                        {/* Financeiro */}
-                        <Card className="overflow-hidden shadow-sm border-muted/40">
-                            <CardHeader className="border-b bg-muted/10 px-4 py-3">
-                                <CardTitle className="text-base font-bold">Detalhes Financeiros</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4">
+                        {/* Financeiro - Only render if relevant data exists */}
+                        {(caseData.value || caseData.netValue || (caseData.paymentMethod && caseData.paymentMethod !== "-")) && (
+                            <CollapsibleCard title="Detalhes Financeiros" defaultOpen>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                    <InfoItem label="Montante Bruto" value={String(caseData.value)} />
-                                    <InfoItem label="Valor Líquido" value={String(caseData.netValue || "-")} />
-                                    <InfoItem label="Forma de Pagamento" value={caseData.paymentMethod} />
+                                    {caseData.value && <InfoItem label="Montante Bruto" value={String(caseData.value)} />}
+                                    {caseData.netValue && <InfoItem label="Valor Líquido" value={String(caseData.netValue)} />}
+                                    {caseData.paymentMethod && caseData.paymentMethod !== "-" && <InfoItem label="Forma de Pagamento" value={caseData.paymentMethod} />}
 
-                                    <Separator className="sm:col-span-3 my-2" />
-
-                                    <InfoItem label="PCC" value={String(caseData.pcc || "-")} />
-                                    <InfoItem label="IR" value={String(caseData.ir || "-")} />
-                                    <InfoItem label="Base ISS" value={String(caseData.issBase || "-")} />
+                                    {/* Taxes */}
+                                    {caseData.pcc && <InfoItem label="PCC" value={String(caseData.pcc)} />}
+                                    {caseData.ir && <InfoItem label="IR" value={String(caseData.ir)} />}
+                                    {caseData.issBase && <InfoItem label="Base ISS" value={String(caseData.issBase)} />}
                                 </div>
-                            </CardContent>
-                        </Card>
+                            </CollapsibleCard>
+                        )}
 
-                        {/* Informações Gerais */}
-                        <Card className="overflow-hidden shadow-sm border-muted/40">
-                            <CardHeader className="border-b bg-muted/10 px-4 py-3">
-                                <CardTitle className="text-base font-bold">Informações Gerais</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <InfoItem label="Cliente" value={caseData.client} />
-                                    <InfoItem label="Data" value={caseData.openedAt} />
+                        {/* Informações Gerais - Dynamic Group */}
+                        <CollapsibleCard title="Informações Gerais" defaultOpen>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {caseData.client && caseData.client !== "N/A" && <InfoItem label="Cliente" value={caseData.client} />}
+                                {caseData.openedAt && caseData.openedAt !== "-" && <InfoItem label="Data" value={caseData.openedAt} />}
+                                {caseData.dueDate && caseData.dueDate !== "-" && <InfoItem label="Vencimento" value={caseData.dueDate} />}
+                                {caseData.responsible && caseData.responsible !== "Não atribuído" && <InfoItem label="Responsável" value={caseData.responsible} />}
+                                {caseData.period && <InfoItem label="Período" value={caseData.period} />}
+                            </div>
+                        </CollapsibleCard>
 
-                                    <InfoItem
-                                        label="Prioridade"
-                                        customValue={
-                                            <div className="flex items-center gap-2">
-                                                <span className={cn(
-                                                    "h-2 w-2 rounded-full",
-                                                    caseData.priority === "Alta" ? "bg-red-500" : "bg-green-500"
-                                                )} />
-                                                <span className={cn(
-                                                    "font-bold",
-                                                    caseData.priority === "Alta" ? "text-red-500" : "text-green-500"
-                                                )}>{caseData.priority}</span>
-                                            </div>
-                                        }
-                                    />
-
-                                    <InfoItem label="Responsável" value={caseData.responsible} />
-                                    <InfoItem label="Período Fiscal" value={caseData.period} />
-                                    <InfoItem label="Última Atualização" value={caseData.lastUpdate} />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Detalhes Financeiros (Collapsed/Smaller if needed but keeping structure) */}
-                        <Card className="overflow-hidden shadow-sm border-muted/40">
-                            <CardHeader className="border-b bg-muted/10 px-4 py-3">
-                                <CardTitle className="text-base font-bold">Detalhes Financeiros</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                    <InfoItem label="Montante Bruto" value={String(caseData.value || "-")} />
-                                    <InfoItem label="Valor Líquido" value={String(caseData.netValue || "-")} />
-                                    <InfoItem label="Forma de Pagamento" value={caseData.paymentMethod} />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Other Dynamic Fields */}
+                        {/* Outros Detalhes - Totally dynamic */}
                         {caseData.otherFields && caseData.otherFields.length > 0 && (
-                            <Card className="overflow-hidden shadow-sm border-muted/40">
-                                <CardHeader className="border-b bg-muted/10 px-4 py-3">
-                                    <CardTitle className="text-base font-bold">Outros Detalhes</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {caseData.otherFields.map((field, idx) => (
-                                            <InfoItem key={idx} label={field.label} value={field.value} />
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <CollapsibleCard title="Outros Detalhes" defaultOpen>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {caseData.otherFields.map((field, idx) => (
+                                        <InfoItem key={idx} label={field.label} value={field.value} />
+                                    ))}
+                                </div>
+                            </CollapsibleCard>
                         )}
 
 
@@ -791,6 +747,29 @@ function TimelineItem({ icon, title, time, content, isActive, isRight }: { icon:
                 <div className="text-sm text-muted-foreground">{content}</div>
             </div>
         </div>
+    );
+}
+
+// Helper component for Collapsible Cards
+function CollapsibleCard({ title, defaultOpen = true, children }: { title: string, defaultOpen?: boolean, children: React.ReactNode }) {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+        <Card className="overflow-hidden shadow-sm border-muted/40">
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                <CollapsibleTrigger asChild>
+                    <CardHeader className="border-b bg-muted/10 px-4 py-3 flex flex-row items-center justify-between cursor-pointer hover:bg-muted/20 transition-colors">
+                        <CardTitle className="text-base font-bold">{title}</CardTitle>
+                        {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                    <CardContent className="p-4">
+                        {children}
+                    </CardContent>
+                </CollapsibleContent>
+            </Collapsible>
+        </Card>
     );
 }
 
