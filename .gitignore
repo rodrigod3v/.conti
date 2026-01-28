@@ -47,3 +47,17 @@ next-env.d.ts
 *.db-journal
 *.db-wal
 
+# SSH Keys and deployment files
+*.key
+*.pem
+id_rsa
+*.ppk
+
+# Deployment scripts
+do_deploy.ps1
+fix_*.ps1
+setup_vm.sh
+
+# Compressed project files
+*.tar.gz
+project.zip

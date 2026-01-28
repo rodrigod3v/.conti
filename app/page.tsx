@@ -6,7 +6,7 @@ import { RecentHistory } from "@/components/features/recent-history";
 import { Calendar } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
-import { read, utils } from "xlsx";
+import { excelToJson } from "@/lib/excel-utils";
 
 export default function Home() {
   const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -15,14 +15,10 @@ export default function Home() {
 
   const handleFileSelect = async (file: File) => {
     try {
-      const data = await file.arrayBuffer();
-      const workbook = read(data);
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json(worksheet);
+      const buffer = await file.arrayBuffer();
+      const { data: jsonData, headers } = await excelToJson(buffer);
 
       if (jsonData.length > 0) {
-        const headers = Object.keys(jsonData[0] as object);
-
         // Save to Database
         try {
           const response = await fetch('/api/files', {
