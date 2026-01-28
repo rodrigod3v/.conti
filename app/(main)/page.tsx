@@ -121,18 +121,18 @@ export default function Home() {
                 const originalKeys = Object.keys(jsonData[0] || {});
                 const hasOriginalChamado = originalKeys.some(k => k.trim().toLowerCase() === "chamado");
 
+                // Filter out "Chamado" if it wasn't in the original file
                 const visibleHeaders = allKeys.filter(k => {
                     if (k === "Chamado" && !hasOriginalChamado) return false;
                     return true;
                 });
 
-                // Sort: First Key First (ID), then others
-                // We need to identify the "First Key" across rows or just take visibleHeaders and likely original order.
-                // Original order is best preserved from originalKeys.
-                const sortedHeaders = [
+                // Sort: First Key First (ID), then others.
+                // We use a Set to prevent duplicates in case logic allows them.
+                const sortedHeaders = Array.from(new Set([
                     ...originalKeys.filter(k => visibleHeaders.includes(k)), // Keep original order
-                    ...visibleHeaders.filter(k => !originalKeys.includes(k)) // Append any new ones (unlikely besides formatted)
-                ];
+                    ...visibleHeaders.filter(k => !originalKeys.includes(k)) // Append any new ones
+                ]));
 
                 // Save to Database
                 try {
