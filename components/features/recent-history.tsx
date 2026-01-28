@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import { useToast } from "@/components/ui/simple-toast";
 
 interface FileRecord {
     id: string;
@@ -46,6 +47,7 @@ export function RecentHistory() {
     const [isExpanded, setIsExpanded] = useState(false); // Added isExpanded state
     const router = useRouter();
     const { setFileData } = useAppStore();
+    const toast = useToast();
 
     useEffect(() => {
         async function fetchFiles() {
@@ -77,14 +79,15 @@ export function RecentHistory() {
                 const headers = Object.keys(parsedRows[0]);
 
                 setFileData(parsedRows, headers, fileData.name, fileData.id);
+                toast.success("Arquivo Aberto", `O arquivo "${fileData.name}" foi carregado com sucesso.`);
                 router.push("/editor");
             } else {
-                alert("Este arquivo não possui dados.");
+                toast.error("Arquivo Vazio", "Este arquivo não possui dados para exibir.");
             }
 
         } catch (error) {
             console.error("Error opening file:", error);
-            alert("Erro ao abrir o arquivo.");
+            toast.error("Erro ao abrir", "Não foi possível carregar o arquivo selecionado.");
         }
     };
 

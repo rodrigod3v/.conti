@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Upload, FileSpreadsheet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/simple-toast";
 
 interface UploadZoneProps {
     onFileSelect: (file: File) => void;
@@ -13,6 +14,7 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const toast = useToast();
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -45,12 +47,12 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
             "text/csv", // .csv
             "application/vnd.ms-excel" // .xls
         ];
-
         if (validTypes.includes(selectedFile.type) || selectedFile.name.endsWith('.csv') || selectedFile.name.endsWith('.xlsx')) {
             setFile(selectedFile);
+            toast.success("Arquivo selecionado", "Tudo pronto para processar.");
             onFileSelect(selectedFile);
         } else {
-            alert("Por favor, envie um arquivo .xlsx ou .csv válido.");
+            toast.error("Formato inválido", "Por favor, envie um arquivo .xlsx ou .csv válido.");
         }
     };
 

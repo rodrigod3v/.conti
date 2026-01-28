@@ -53,6 +53,7 @@ import { isDropdownColumn, isDateColumn, isCurrencyColumn, isObservationColumn }
 
 
 
+import { useToast } from "@/components/ui/simple-toast";
 import { useAppStore } from "@/lib/store";
 import { useMemo, useState, useEffect } from "react";
 
@@ -61,6 +62,8 @@ export default function CaseDetailsPage() {
     const caseId = decodeURIComponent(params.id as string);
     const { fileData, headers, updateCell, comments, addComment } = useAppStore();
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const toast = useToast();
+    // ...
 
     // Comment State
     const [newComment, setNewComment] = useState("");
@@ -217,6 +220,7 @@ export default function CaseDetailsPage() {
         });
 
         setIsEditOpen(false);
+        toast.success("Alterações salvas!", "O caso foi atualizado com sucesso.");
     };
 
     const formatCurrency = (value: string) => {
@@ -246,6 +250,7 @@ export default function CaseDetailsPage() {
         // Add comment to store (currentUser hardcoded as "Eu (Admin)" for now)
         addComment(caseId, newComment, "Eu (Admin)");
         setNewComment("");
+        toast.success("Comentário enviado", "Sua nota foi adicionada ao histórico.");
     };
 
     // Get comments for this case
@@ -416,13 +421,18 @@ export default function CaseDetailsPage() {
                                                             if (isDateColumn(key)) return false; // Dates
                                                             if (lower === "status") return false; // Status
                                                             if (isCurrencyColumn(key)) return false; // Financial
-                                                            if (lower.includes("chamado") || lower.includes("caso")) return false; // IDs
+
+                                                            // Strict ID Filtering
+                                                            if (lower === "id" || lower === "chamado" || lower === "caso" || lower.includes(" id ")) return false;
+                                                            if (lower.startsWith("id ") || lower.endsWith(" id")) return false;
+
                                                             return true;
                                                         })
                                                         .sort()
                                                         .map((key) => {
                                                             const options = uniqueOptions[key] || [];
-                                                            const useDropdown = isDropdownColumn(key) && options.length > 0;
+                                                            // Smart Dropdown Logic: Use dropdown if explicitly defined OR if it has few unique options (< 20)
+                                                            const useDropdown = (isDropdownColumn(key) || (options.length > 0 && options.length <= 20));
                                                             const currentValue = editForm[key] || "";
 
                                                             return (
@@ -461,7 +471,8 @@ export default function CaseDetailsPage() {
                                                             !lower.includes("respons") && !lower.includes("usuario") &&
                                                             !lower.includes("status") && !lower.includes("observ") &&
                                                             !lower.includes("notas") && !lower.includes("data") &&
-                                                            !lower.includes("chamado") && !lower.includes("caso");
+                                                            !lower.includes("chamado") && !lower.includes("caso") &&
+                                                            lower !== "id" && !lower.includes(" id ") && !lower.startsWith("id ") && !lower.endsWith(" id");
                                                     }).length === 0 && (
                                                             <div className="text-sm text-gray-500 italic py-4">Nenhum campo adicional disponível.</div>
                                                         )}

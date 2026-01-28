@@ -6,17 +6,19 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 
+import { ToastProvider } from "@/components/ui/simple-toast";
+
 export function MainLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const isLoginPage = pathname === "/login";
     const { isSidebarOpen, toggleSidebar } = useAppStore();
 
     if (isLoginPage) {
-        return <>{children}</>;
+        return <ToastProvider>{children}</ToastProvider>;
     }
 
     return (
-        <>
+        <ToastProvider>
             <Sidebar />
 
             {!isSidebarOpen && (
@@ -38,6 +40,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                     {children}
                 </div>
             </main>
-        </>
+        </ToastProvider>
     );
 }

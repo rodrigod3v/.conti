@@ -46,6 +46,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { NewCaseWizard } from "@/components/features/new-case-wizard";
+import { useToast } from "@/components/ui/simple-toast";
 
 // --- Helper Components ---
 
@@ -245,6 +246,7 @@ export function DataEditor() {
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [isMounted, setIsMounted] = useState(false);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const toast = useToast();
 
     useEffect(() => {
         setIsMounted(true);
@@ -275,10 +277,15 @@ export function DataEditor() {
     }, [fileData, router, isMounted]);
 
     const handleExit = () => {
-        if (confirm("Tem certeza que deseja encerrar a edição? Os dados não salvos serão perdidos da visualização.")) {
-            clearData();
-            router.push("/");
-        }
+        toast.action(
+            "Tem certeza que deseja sair?",
+            "Sim, Sair Agora",
+            () => {
+                clearData();
+                router.push("/");
+            },
+            "Os dados não salvos serão perdidos."
+        );
     };
 
     // Local state for UI
@@ -407,7 +414,7 @@ export function DataEditor() {
     const handleSave = async () => {
         const { fileId, fileData: currentFileData } = useAppStore.getState();
         if (!fileId) {
-            alert("Erro: ID do arquivo não encontrado. Salve novamente ou reabra o arquivo.");
+            toast.error("Erro ao salvar", "ID do arquivo não encontrado. Salve novamente ou reabra o arquivo.");
             return;
         }
         setIsSaving(true);
@@ -419,15 +426,20 @@ export function DataEditor() {
             });
             if (!response.ok) throw new Error("Falha ao salvar");
 
-            // Offer to download the updated file immediately
-            if (confirm("Alterações salvas na plataforma com sucesso!\n\nDeseja baixar uma cópia atualizada da planilha para o seu computador agora?")) {
-                handleExport();
-            } else {
-                alert("Alterações salvas! Lembre-se de usar o botão 'Exportar' se precisar do arquivo atualizado em seu computador.");
-            }
+            // Success Toast
+            toast.success("Alterações salvas!", "Banco de dados atualizado com sucesso.");
+
+            // Offer to download via Toast Action (Non-blocking)
+            toast.action(
+                "Baixar versão atualizada?",
+                "Baixar Agora",
+                () => handleExport(),
+                "Mantenha seu arquivo local sincronizado."
+            );
+
         } catch (error) {
             console.error("Erro ao salvar:", error);
-            alert("Erro ao salvar alterações no banco de dados.");
+            toast.error("Erro ao salvar", "Não foi possível persistir as alterações.");
         } finally {
             setIsSaving(false);
         }
@@ -709,9 +721,15 @@ export function DataEditor() {
                                                                 size="icon"
                                                                 className="h-7 w-7 text-muted-foreground hover:text-red-600"
                                                                 onClick={() => {
-                                                                    if (confirm("Tem certeza que deseja excluir esta linha?")) {
-                                                                        deleteRow(globalIndex);
-                                                                    }
+                                                                    toast.action(
+                                                                        "Excluir item permanentemente?",
+                                                                        "Sim, Excluir",
+                                                                        () => {
+                                                                            deleteRow(globalIndex);
+                                                                            toast.success("Item excluído", "Registro removido com sucesso.");
+                                                                        },
+                                                                        "Esta ação não pode ser desfeita."
+                                                                    );
                                                                 }}
                                                             >
                                                                 <Trash2 className="h-3.5 w-3.5" />

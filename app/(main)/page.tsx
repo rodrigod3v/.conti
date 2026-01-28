@@ -8,11 +8,13 @@ import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { read, utils } from "xlsx";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/simple-toast";
 
 export default function Home() {
     const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
     const { setFileData } = useAppStore();
     const router = useRouter();
+    const toast = useToast();
 
     const handleFileSelect = async (file: File) => {
         try {
@@ -149,21 +151,22 @@ export default function Home() {
                     if (!response.ok) throw new Error("Falha ao salvar no banco");
 
                     const savedFile = await response.json();
-                    // Update store with new file ID (for Data Editor context)
+
+                    toast.success("Arquivo Processado", "Os dados foram importados com sucesso.");
                     setFileData(transformedData, sortedHeaders, file.name, savedFile.id);
-                    // Ideally store the savedFile.id in the store too
+
                 } catch (dbError) {
                     console.error("Erro de persistência:", dbError);
-                    alert("Erro ao salvar no banco de dados, mas carregando visualização...");
+                    toast.error("Erro ao Salvar", "Falha ao salvar no banco, mas carregando visualização...");
                 }
 
                 router.push("/editor");
             } else {
-                alert("O arquivo parece estar vazio.");
+                toast.error("Arquivo Vazio", "O arquivo selecionado não contém dados.");
             }
         } catch (error) {
             console.error("Erro ao ler arquivo:", error);
-            alert("Erro ao processar o arquivo. Verifique se é um Excel válido.");
+            toast.error("Erro de Leitura", "Falha ao processar o arquivo. Verifique se é válido.");
         }
     };
 

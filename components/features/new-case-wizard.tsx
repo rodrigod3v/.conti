@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { isDropdownColumn, isDateColumn, isCurrencyColumn } from "@/lib/column-utils";
 import { useMemo } from "react";
 
+import { useToast } from "@/components/ui/simple-toast";
+
 interface NewCaseWizardProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -34,6 +36,7 @@ export function NewCaseWizard({ open, onOpenChange }: NewCaseWizardProps) {
 
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState<Record<string, string>>({});
+    const toast = useToast();
 
     const totalSteps = fieldList.length;
     const currentField = fieldList[currentStep];
@@ -43,6 +46,10 @@ export function NewCaseWizard({ open, onOpenChange }: NewCaseWizardProps) {
             setCurrentStep(prev => prev + 1);
         } else {
             handleSubmit();
+            setFormData({});
+            setCurrentStep(0);
+            onOpenChange(false);
+            toast.success("Novo item adicionado!", "O registro foi criado com sucesso e salvo na memória.");
         }
     };
 
@@ -79,7 +86,6 @@ export function NewCaseWizard({ open, onOpenChange }: NewCaseWizardProps) {
         setFormData({});
         setCurrentStep(0);
         onOpenChange(false);
-        alert("Novo caso adicionado com sucesso!");
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
