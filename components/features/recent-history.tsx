@@ -76,7 +76,7 @@ export function RecentHistory() {
                 const parsedRows = fileData.rows.map((row: any) => JSON.parse(row.data));
                 const headers = Object.keys(parsedRows[0]);
 
-                setFileData(parsedRows, headers, fileData.name);
+                setFileData(parsedRows, headers, fileData.name, fileData.id);
                 router.push("/editor");
             } else {
                 alert("Este arquivo não possui dados.");
@@ -137,7 +137,7 @@ export function RecentHistory() {
                                 <tr key={file.id} className="group hover:bg-muted/20">
                                     <td className="whitespace-nowrap px-4 py-2">
                                         <div className="flex items-center gap-3">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                                 <FileSpreadsheet className="h-5 w-5" />
                                             </div>
                                             <div>
@@ -164,7 +164,7 @@ export function RecentHistory() {
                                     <td className="whitespace-nowrap px-4 py-2 text-right">
                                         <Button
                                             variant="ghost"
-                                            className="font-medium text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                                            className="font-medium text-primary hover:bg-primary/10 hover:text-primary"
                                             onClick={() => handleOpenFile(file.id)}
                                         >
                                             Abrir

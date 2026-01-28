@@ -88,8 +88,8 @@ export function Sidebar() {
                                 <Link
                                     href={item.href}
                                     className={cn(
-                                        "flex items-center rounded-lg p-2 text-sm text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950 dark:hover:text-emerald-400 group transition-all",
-                                        isActive && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                                        "flex items-center rounded-lg p-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group transition-all",
+                                        isActive && "bg-sidebar-accent text-sidebar-primary font-medium shadow-sm"
                                     )}
                                 >
                                     <item.icon className="h-4 w-4 flex-shrink-0 transition duration-75" />
@@ -108,8 +108,8 @@ export function Sidebar() {
                                 <Link
                                     href={item.href}
                                     className={cn(
-                                        "flex items-center rounded-lg p-2 text-sm text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950 dark:hover:text-emerald-400 group transition-all",
-                                        isActive && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                                        "flex items-center rounded-lg p-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group transition-all",
+                                        isActive && "bg-sidebar-accent text-sidebar-primary font-medium shadow-sm"
                                     )}
                                 >
                                     <item.icon className="h-4 w-4 flex-shrink-0 transition duration-75" />
@@ -131,7 +131,7 @@ export function Sidebar() {
                     </div>
 
                     <div className="mt-4 flex items-center gap-3 rounded-xl bg-muted/50 p-2">
-                        <div className="h-8 w-8 overflow-hidden rounded-full border border-border flex items-center justify-center bg-emerald-100 text-emerald-700 font-bold">
+                        <div className="h-8 w-8 overflow-hidden rounded-full border border-border flex items-center justify-center bg-primary/10 text-primary font-bold">
                             {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
                         </div>
                         <div className="flex flex-col overflow-hidden">

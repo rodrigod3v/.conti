@@ -48,7 +48,7 @@ export default function DashboardPage() {
                         </SelectContent>
                     </Select>
 
-                    <Button variant="outline" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-200">
+                    <Button variant="outline" className="text-primary hover:bg-primary/5 hover:text-primary border-primary/20 bg-primary/5">
                         <Download className="mr-2 h-4 w-4" />
                         Exportar
                     </Button>

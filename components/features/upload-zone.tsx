@@ -64,8 +64,8 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
     return (
         <div
             className={cn(
-                "relative flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-emerald-500/30 bg-white p-6 transition-all duration-300 dark:bg-card",
-                isDragging && "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
+                "relative flex flex-col items-center justify-center rounded-3xl border-dashed border-2 bg-white p-6 transition-all duration-300 dark:bg-card border-border",
+                isDragging && "border-accent-foreground bg-accent"
             )}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -81,20 +81,20 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
 
             {!file ? (
                 <>
-                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-sm dark:bg-emerald-900/30">
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-sm">
                         <Upload className="h-6 w-6" />
                     </div>
                     <h3 className="mb-2 text-lg font-bold text-foreground">Upload de Arquivos</h3>
                     <p className="mb-4 max-w-md text-center text-sm text-muted-foreground">
-                        Arraste e solte seus arquivos <span className="font-semibold text-emerald-600">XLSX</span> ou{" "}
-                        <span className="font-semibold text-emerald-600">CSV</span> aqui para iniciar a análise automática.
+                        Arraste e solte seus arquivos <span className="font-semibold text-accent-foreground">XLSX</span> ou{" "}
+                        <span className="font-semibold text-accent-foreground">CSV</span> aqui para iniciar a análise automática.
                         <br />
                         <span className="text-xs opacity-70">(Máximo 200MB por arquivo)</span>
                     </p>
                     <Button
                         size="lg"
                         onClick={() => fileInputRef.current?.click()}
-                        className="h-12 rounded-xl bg-teal-700 px-8 text-base font-semibold text-white shadow-lg shadow-teal-700/20 hover:bg-teal-800"
+                        className="h-12 rounded-xl bg-primary px-8 text-base font-semibold text-primary-foreground shadow-lg hover:bg-primary/90"
                     >
                         <FileSpreadsheet className="mr-2 h-5 w-5" />
                         Selecionar do computador

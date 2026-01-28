@@ -11,8 +11,10 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { isDropdownColumn, isDateColumn, isCurrencyColumn, isObservationColumn } from "@/lib/column-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -47,23 +49,26 @@ const StatusBadge = ({ status }: { status: string }) => {
     // Normalizing status for comparison
     const s = status?.toString().toLowerCase().trim() || "";
 
-    if (s === "pendente") {
-        return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none">Pendente</Badge>;
+    if (s.includes("pago") && !s.includes("parcial")) {
+        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">{status}</Badge>;
     }
-    if (s === "aprovado") {
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Aprovado</Badge>;
+    if (s.includes("parcialmente") || s.includes("parcial")) {
+        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">{status}</Badge>;
     }
-    if (s === "resolvido") {
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Resolvido</Badge>;
+    if (s.includes("cancelado")) {
+        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-none">{status}</Badge>;
+    }
+    if (s === "pendente" || s.includes("aguardando")) {
+        return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none">{status}</Badge>;
+    }
+    if (s === "aprovado" || s === "concluído" || s === "concluido" || s === "resolvido" || s === "ok") {
+        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">{status}</Badge>;
     }
     if (s === "erro" || s === "missing") {
-        return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-none">Erro</Badge>;
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-none">{status}</Badge>;
     }
-    if (s === "em análise" || s === "em analise") {
-        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">Em Análise</Badge>;
-    }
-    if (s === "cancelado") {
-        return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-200 border-none">Cancelado</Badge>;
+    if (s.includes("análise") || s.includes("analise") || s.includes("andamento")) {
+        return <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-none">{status}</Badge>;
     }
 
     return <Badge variant="secondary">{status}</Badge>;
@@ -98,6 +103,11 @@ const ObservationCell = ({ value, globalIndex, header, updateCell }: { value: st
     const [currentVal, setCurrentVal] = useState(String(value || ""));
     const [isOpen, setIsOpen] = useState(false);
 
+    // Sync local state if prop value changes (e.g. from external update)
+    useEffect(() => {
+        setCurrentVal(String(value || ""));
+    }, [value]);
+
     const handleSaveObs = () => {
         updateCell(globalIndex, header, currentVal);
         setIsOpen(false);
@@ -107,30 +117,32 @@ const ObservationCell = ({ value, globalIndex, header, updateCell }: { value: st
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <div
-                    className="text-sm text-foreground/80 block max-w-[150px] truncate cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors border border-transparent hover:border-border/40"
-                    title="Clique para editar"
+                    className="text-xs text-foreground/80 block max-w-[200px] truncate cursor-pointer hover:bg-blue-50/50 hover:text-blue-700 rounded px-2 py-1 transition-colors border border-transparent hover:border-blue-100 min-h-[32px] flex items-center"
+                    title="Clique para editar observação completa"
                 >
-                    {value || <span className="text-muted-foreground/50 italic text-xs">Adicionar obs...</span>}
+                    {value ? value : <span className="text-muted-foreground/40 italic text-[10px]">Adicionar...</span>}
                 </div>
             </PopoverTrigger>
-            <PopoverContent className="w-96 p-4">
-                <div className="space-y-4">
-                    <h4 className="font-medium leading-none text-sm text-muted-foreground">Editar Observação</h4>
-                    <div className="relative">
-                        <Input
-                            value={currentVal}
-                            onChange={(e) => setCurrentVal(e.target.value)}
-                            maxLength={30}
-                            className="h-9 pr-12"
-                            placeholder="Digite a observação..."
-                        />
-                        <span className="absolute right-2 top-2.5 text-[10px] text-muted-foreground font-mono">
-                            {currentVal.length}/30
+            <PopoverContent className="w-[400px] p-4 shadow-xl" align="start" side="bottom">
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                        <h4 className="font-semibold leading-none text-sm text-foreground">Editar {header}</h4>
+                        <span className="text-[10px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+                            {currentVal.length} caracteres
                         </span>
                     </div>
-                    <div className="flex justify-end gap-2">
+
+                    <Textarea
+                        value={currentVal}
+                        onChange={(e) => setCurrentVal(e.target.value)}
+                        className="min-h-[150px] resize-y text-xs leading-relaxed font-normal"
+                        placeholder={`Digite ${header.toLowerCase()}...`}
+                        autoFocus
+                    />
+
+                    <div className="flex justify-end gap-2 pt-2">
                         <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setIsOpen(false)}>Cancelar</Button>
-                        <Button size="sm" className="h-7 text-xs bg-teal-700 hover:bg-teal-800 text-white" onClick={handleSaveObs}>Salvar</Button>
+                        <Button size="sm" className="h-7 text-xs bg-primary hover:bg-primary/90 text-primary-foreground" onClick={handleSaveObs}>Salvar</Button>
                     </div>
                 </div>
             </PopoverContent>
@@ -138,7 +150,92 @@ const ObservationCell = ({ value, globalIndex, header, updateCell }: { value: st
     );
 };
 
+// --- Editable Cell Logic ---
+const EditableCell = ({
+    row,
+    rowIndex,
+    header,
+    globalIndex,
+    updateCell,
+    allUniqueValues
+}: {
+    row: any,
+    rowIndex: number,
+    header: string,
+    globalIndex: number,
+    updateCell: (index: number, key: string, value: any) => void,
+    allUniqueValues: Record<string, string[]>
+}) => {
+    const value = row[header] || "";
+    const headerLower = header.toLowerCase();
+
+    // 1. Observation / Description - Popover Textarea
+    if (isObservationColumn(header)) {
+        return <ObservationCell value={value} globalIndex={globalIndex} header={header} updateCell={updateCell} />;
+    }
+
+    // 2. Dropdown Fields (Status, Nome, Cliente, Produto, Unidade)
+    if (isDropdownColumn(header)) {
+        const options = allUniqueValues[header] || [];
+        return (
+            <Select value={value} onValueChange={(val) => updateCell(globalIndex, header, val)}>
+                <SelectTrigger className="h-8 w-full border-transparent hover:border-border focus:ring-1 focus:ring-primary/20 bg-transparent px-2 text-xs truncate text-left">
+                    <SelectValue placeholder={value} />
+                </SelectTrigger>
+                <SelectContent>
+                    {options.map((opt) => (
+                        <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+                    ))}
+                    {!options.includes(value) && value && <SelectItem value={value} className="text-xs">{value}</SelectItem>}
+                </SelectContent>
+            </Select>
+        );
+    }
+
+    // 3. Date Input
+    if (isDateColumn(header)) {
+        let displayValue = value;
+        const num = parseFloat(String(value));
+        if (!isNaN(num) && num > 20000 && String(value).trim().match(/^\d+(\.\d+)?$/)) {
+            try {
+                const date = new Date((num - 25569) * 86400 * 1000 + 43200000);
+                displayValue = format(date, "dd/MM/yyyy");
+            } catch (e) { }
+        }
+        return (
+            <div className="relative group min-w-[120px]">
+                <Input
+                    className="h-8 w-full border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary/20 bg-transparent px-2 text-xs"
+                    value={displayValue}
+                    onChange={(e) => updateCell(globalIndex, header, e.target.value)}
+                />
+            </div>
+        );
+    }
+
+    // 4. Money/Numeric Input
+    if (isCurrencyColumn(header)) {
+        return (
+            <Input
+                className="h-8 w-full border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary/20 bg-transparent px-2 text-xs text-right font-mono min-w-[100px]"
+                value={value}
+                onChange={(e) => updateCell(globalIndex, header, e.target.value)}
+            />
+        );
+    }
+
+    // 5. Default Text Input
+    return (
+        <Input
+            className="h-8 w-full border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary/20 bg-transparent px-2 text-xs min-w-[150px]"
+            value={value}
+            onChange={(e) => updateCell(globalIndex, header, e.target.value)}
+        />
+    );
+};
+
 export function DataEditor() {
+    // ... (DataEditor START) ...
     const { fileData, headers, fileName, updateCell, setFileData } = useAppStore();
     const [isSaving, setIsSaving] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -148,21 +245,14 @@ export function DataEditor() {
         if (!container) return;
 
         const handleWheel = (e: WheelEvent) => {
-            // Find the actual scrollable element (shadcn Table wrapper)
             const scrollTarget = container.querySelector('[data-slot="table-container"]') || container;
-
             if (e.deltaY !== 0) {
-                // If scrolling vertically, convert to horizontal for the table
                 e.preventDefault();
                 scrollTarget.scrollLeft += e.deltaY;
             }
         };
-
         container.addEventListener('wheel', handleWheel, { passive: false });
-
-        return () => {
-            container.removeEventListener('wheel', handleWheel);
-        };
+        return () => container.removeEventListener('wheel', handleWheel);
     }, []);
 
     // Local state for UI
@@ -174,17 +264,6 @@ export function DataEditor() {
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
     const itemsPerPage = 15;
-
-    // Load mock data if empty (For Verification Purpose)
-    // Removed auto-mock to avoid user confusion.
-    // useEffect(() => {
-    //     if (!fileData || fileData.length === 0) {
-    //         const mock = generateMockData();
-    //         // Infer headers from first row
-    //         const mockHeaders = Object.keys(mock[0]);
-    //         setFileData(mock, mockHeaders, "lançamentos contábeis de Maio/2024");
-    //     }
-    // }, [fileData, setFileData]);
 
     // Computed Data
     const uniqueValues = useMemo(() => {
@@ -205,9 +284,25 @@ export function DataEditor() {
         ).length;
     }, [fileData]);
 
+    // Compute unique values for ALL columns to populate Dropdowns
+    const allUniqueValues = useMemo(() => {
+        const map: Record<string, string[]> = {};
+        if (!fileData) return map;
+        headers.forEach(h => {
+            const values = new Set<string>();
+            fileData.forEach(row => {
+                const val = row[h];
+                if (val !== undefined && val !== null && String(val).trim() !== "") {
+                    values.add(String(val));
+                }
+            });
+            map[h] = Array.from(values).sort();
+        });
+        return map;
+    }, [fileData, headers]);
+
     const filteredData = useMemo(() => {
         let data = fileData;
-
         // Search
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
@@ -215,68 +310,48 @@ export function DataEditor() {
                 Object.values(row).some(val => {
                     const strVal = String(val).toLowerCase();
                     if (strVal.includes(lowerSearch)) return true;
-
                     // Check formatted number/currency
                     const num = parseFloat(String(val).replace("R$", "").replace(".", "").replace(",", "."));
                     if (!isNaN(num)) {
                         const formatted = new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(num);
                         if (formatted.includes(lowerSearch)) return true;
                     }
-
                     return false;
                 })
             );
         }
-
         // Column Filter
         if (filterColumn !== "all" && filterValue !== "all") {
-            data = data.filter(row =>
-                String(row[filterColumn]) === filterValue
-            );
+            data = data.filter(row => String(row[filterColumn]) === filterValue);
         }
-
         // Date Filter
         if (dateFilter) {
             const filterDateStr = format(dateFilter, "dd/MM/yyyy");
-            data = data.filter(row => {
-                // Assuming format dd/MM/yyyy in data
-                return String(row["Data"]) === filterDateStr;
-            });
+            data = data.filter(row => String(row["Data"]) === filterDateStr);
         }
-
         // Sorting
         if (sortConfig) {
             data.sort((a, b) => {
                 const aValue = a[sortConfig.key];
                 const bValue = b[sortConfig.key];
-
                 if (aValue === bValue) return 0;
-
-                // Handle numbers disguised as strings
                 const aNum = parseFloat(String(aValue).replace("R$", "").replace(".", "").replace(",", "."));
                 const bNum = parseFloat(String(bValue).replace("R$", "").replace(".", "").replace(",", "."));
-
                 if (!isNaN(aNum) && !isNaN(bNum)) {
                     return sortConfig.direction === "asc" ? aNum - bNum : bNum - aNum;
                 }
-
                 const aStr = String(aValue).toLowerCase();
                 const bStr = String(bValue).toLowerCase();
-
                 if (aStr < bStr) return sortConfig.direction === "asc" ? -1 : 1;
                 if (aStr > bStr) return sortConfig.direction === "asc" ? 1 : -1;
                 return 0;
             });
         }
-
         return data;
     }, [fileData, searchTerm, filterColumn, filterValue, dateFilter, sortConfig]);
 
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-    const paginatedData = filteredData.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
+    const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
@@ -289,112 +364,82 @@ export function DataEditor() {
 
     const handleSelectRow = (rowIndex: number, checked: boolean) => {
         const newSelected = new Set(selectedRows);
-        if (checked) {
-            newSelected.add(rowIndex);
-        } else {
-            newSelected.delete(rowIndex);
-        }
-        setSelectedRows(newSelected);
+        if (checked) newSelected.add(rowIndex);
+        else newSelected.delete(rowIndex);
         setSelectedRows(newSelected);
     };
 
     const handleSort = (key: string) => {
         setSortConfig(current => {
             if (current?.key === key) {
-                return current.direction === "asc"
-                    ? { key, direction: "desc" }
-                    : null;
+                return current.direction === "asc" ? { key, direction: "desc" } : null;
             }
             return { key, direction: "asc" };
         });
     };
 
     const handleSave = async () => {
+        const { fileId } = useAppStore.getState();
+        if (!fileId) {
+            alert("Erro: ID do arquivo não encontrado. Salve novamente ou reabra o arquivo.");
+            return;
+        }
         setIsSaving(true);
-        // Simulate save
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        alert("Alterações salvas (Simulação)");
-        setIsSaving(false);
+        try {
+            const response = await fetch(`/api/files/${fileId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rows: fileData })
+            });
+            if (!response.ok) throw new Error("Falha ao salvar");
+            alert("Alterações salvas com sucesso!");
+        } catch (error) {
+            console.error("Erro ao salvar:", error);
+            alert("Erro ao salvar alterações no banco de dados.");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleExport = () => {
         if (!fileData || fileData.length === 0) return;
-
         const worksheet = XLSX.utils.json_to_sheet(fileData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Dados");
-
-        // Generate filename
         const exportName = fileName ? `${fileName.replace(/\.[^/.]+$/, "")}_editado.xlsx` : "dados_exportados.xlsx";
         XLSX.writeFile(workbook, exportName);
     };
 
+
+
     // Helper to render specialized cells
-    const renderCell = (header: string, row: any, rowIndex: number, globalIndex: number) => {
-        const value = row[header];
+    const renderCell = (header: string, row: any, rowIndex: number, globalIndex: number, colIndex: number) => {
         const headerLower = header.toLowerCase();
 
-        if (headerLower === "chamado" || headerLower === "caso") {
-            const displayValue = value || "Link";
+        // 0. First Column is ALWAYS the ID/Link (User Request)
+        if (colIndex === 0) {
+            // Priority: Chamado key (hidden internal), Case key, then header value
+            const linkId = row["Chamado"] || row["Caso"] || row[header];
+            const value = row[header];
             return (
-                <Link href={`/cases/${row["Chamado"] || row["Caso"] || value}`} className="font-medium text-blue-600 hover:underline hover:text-blue-800 line-clamp-1 block" title={String(value)}>
-                    {value}
+                <Link href={`/cases/${linkId}`} className="font-medium text-blue-600 hover:underline hover:text-blue-800 line-clamp-1 block px-2 min-w-[120px]" title={String(value)}>
+                    {value || "CS-Link"}
                 </Link>
             );
         }
 
-        if (headerLower === "observações" || headerLower === "observacoes") {
-            // Interactive observation cell
-            return <ObservationCell value={value} globalIndex={globalIndex} header={header} updateCell={updateCell} />;
-        }
-
-        if (headerLower === "status") {
+        // Special READ-ONLY Columns (Legacy checks, keeping explicitly for safety)
+        if (headerLower === "chamado" || headerLower === "caso") {
+            const value = row[header];
             return (
-                <div className="flex items-center justify-center">
-                    <StatusBadge status={String(value)} />
-                </div>
+                <Link href={`/cases/${row["Chamado"] || row["Caso"] || value}`} className="font-medium text-blue-600 hover:underline hover:text-blue-800 line-clamp-1 block px-2 min-w-[120px]" title={String(value)}>
+                    {value || "CS-Link"}
+                </Link>
             );
         }
 
-        if (headerLower === "responsável" || headerLower === "responsavel") {
-            return (
-                <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${value}`} />
-                        <AvatarFallback>{String(value).substring(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium text-sm">{value}</span>
-                </div>
-            );
-        }
-
-        if (headerLower.includes("data")) {
-            const num = parseFloat(String(value));
-            // Check if it's an Excel serial date (usually > 30000 for recent dates)
-            if (!isNaN(num) && num > 20000) {
-                // Convert Excel serial date to JS Date
-                const date = new Date((num - 25569) * 86400 * 1000 + 43200000);
-                return <span className="text-sm text-foreground/80">{format(date, "dd/MM/yyyy")}</span>;
-            }
-        }
-
-        if (headerLower.includes("valor") || headerLower.includes("montante")) {
-            const num = parseFloat(String(value).replace("R$", "").replace(".", "").replace(",", "."));
-            const display = isNaN(num) ? value :
-                new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(num);
-
-            const isError = String(row["Status"]).toLowerCase() === "erro";
-            const colorClass = isError && num < 0 ? "text-red-500 font-bold" : "";
-
-            return (
-                <div className={`flex items-center justify-end gap-2 text-right font-mono ${colorClass}`}>
-                    <span>{display}</span>
-                    {isError && <AlertCircle className="h-4 w-4 text-red-500" />}
-                </div>
-            );
-        }
-
-        return <span className="text-sm text-foreground/80 block max-w-[200px] truncate" title={String(value)}>{value}</span>;
+        // Editable Everything Else
+        return <EditableCell row={row} rowIndex={rowIndex} header={header} globalIndex={globalIndex} updateCell={updateCell} allUniqueValues={allUniqueValues} />;
     };
 
 
@@ -415,7 +460,7 @@ export function DataEditor() {
                         )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        Gerencie lançamentos contábeis de {fileName ? fileName.replace("lançamentos contábeis de ", "") : "Maio/2024"}
+                        Gerencie lançamentos contábeis de {fileName ? fileName.replace("lançamentos contábeis de ", "") : format(new Date(), "MMMM/yyyy", { locale: ptBR })}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -426,7 +471,7 @@ export function DataEditor() {
                     <Button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="h-9 gap-2 bg-teal-700 hover:bg-teal-800 text-white shadow-sm"
+                        className="h-9 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                     >
                         {isSaving ? (
                             "Salvando..."
@@ -490,10 +535,10 @@ export function DataEditor() {
                         <PopoverTrigger asChild>
                             <Button variant="outline" className={cn(
                                 "h-9 border-muted-foreground/20 gap-2 font-normal text-muted-foreground",
-                                dateFilter && "text-teal-700 border-teal-200 bg-teal-50"
+                                dateFilter && "text-accent-foreground border-accent-foreground/30 bg-accent"
                             )}>
                                 <CalendarIcon className="h-4 w-4" />
-                                {dateFilter ? format(dateFilter, "dd/MM/yyyy", { locale: ptBR }) : "Maio 2024"}
+                                {dateFilter ? format(dateFilter, "dd/MM/yyyy", { locale: ptBR }) : format(new Date(), "dd/MM/yyyy", { locale: ptBR })}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="end">
@@ -543,9 +588,11 @@ export function DataEditor() {
                                     />
                                 </TableHead>
                                 {headers.map((header) => {
-                                    const hLower = header.toLowerCase();
-                                    const isNumeric = hLower.includes("valor") || hLower.includes("montante");
-                                    const isStatus = hLower === "status";
+                                    const isNumeric = isCurrencyColumn(header);
+                                    const isStatus = header.toLowerCase() === "status";
+
+                                    // Custom widths for headers
+                                    const isWide = isDropdownColumn(header) || isObservationColumn(header);
 
                                     return (
                                         <TableHead
@@ -553,7 +600,8 @@ export function DataEditor() {
                                             className={cn(
                                                 "h-9 font-semibold text-xs uppercase tracking-wider text-muted-foreground/80 cursor-pointer hover:text-foreground transition-colors select-none bg-transparent",
                                                 isNumeric && "text-right pr-6",
-                                                isStatus && "text-center"
+                                                isStatus && "text-center",
+                                                isWide ? "min-w-[200px]" : "min-w-[120px]"
                                             )}
                                             onClick={() => handleSort(header)}
                                         >
@@ -597,9 +645,9 @@ export function DataEditor() {
                                                     onCheckedChange={(c) => handleSelectRow(globalIndex, c === true)}
                                                 />
                                             </TableCell>
-                                            {headers.map((header) => (
+                                            {headers.map((header, colIndex) => (
                                                 <TableCell key={`${globalIndex}-${header}`} className="py-1 h-9">
-                                                    {renderCell(header, row, index, globalIndex)}
+                                                    {renderCell(header, row, index, globalIndex, colIndex)}
                                                 </TableCell>
                                             ))}
                                             <TableCell className="text-right pr-4 py-1 h-9">
@@ -608,7 +656,7 @@ export function DataEditor() {
                                                         <Check className="h-4 w-4 text-emerald-600" />
                                                     ) : (
                                                         <Link href={`/cases/${row["Chamado"] || row["chamado"] || row["Caso"] || row["caso"]}`}>
-                                                            <Pencil className="h-4 w-4 text-muted-foreground cursor-pointer hover:text-teal-600" />
+                                                            <Pencil className="h-4 w-4 text-muted-foreground cursor-pointer hover:text-accent-foreground" />
                                                         </Link>
                                                     )}
                                                 </div>
@@ -657,7 +705,7 @@ export function DataEditor() {
                                         key={p}
                                         variant={p === currentPage ? "default" : "ghost"}
                                         size="sm"
-                                        className={cn("h-8 w-8 text-xs", p === currentPage ? "bg-teal-700 text-white hover:bg-teal-800" : "")}
+                                        className={cn("h-8 w-8 text-xs", p === currentPage ? "bg-primary text-primary-foreground hover:bg-primary/90" : "")}
                                         onClick={() => setCurrentPage(p)}
                                     >
                                         {p}

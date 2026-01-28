@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isDropdownColumn, isDateColumn, isCurrencyColumn, isObservationColumn } from "@/lib/column-utils";
 
 
 
@@ -270,12 +271,12 @@ export default function CaseDetailsPage() {
                             </h1>
                             <Badge className={cn(
                                 "px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border-none",
-                                caseData.status.toLowerCase() === "pendente" && "bg-amber-100 text-amber-700",
-                                caseData.status.toLowerCase() === "erro" && "bg-red-100 text-red-700",
-                                caseData.status.toLowerCase() === "aprovado" && "bg-emerald-100 text-emerald-700",
-                                caseData.status.toLowerCase() === "resolvido" && "bg-emerald-100 text-emerald-700",
-                                (caseData.status.toLowerCase().includes("análise") || caseData.status.toLowerCase().includes("analise")) && "bg-blue-100 text-blue-700",
-                                caseData.status.toLowerCase() === "cancelado" && "bg-gray-100 text-gray-700"
+                                caseData.status.toLowerCase().includes("pendente") && "bg-amber-100 text-amber-700",
+                                caseData.status.toLowerCase().includes("erro") && "bg-red-100 text-red-700",
+                                (caseData.status.toLowerCase().includes("aprovado") || caseData.status.toLowerCase().includes("resolvido") || caseData.status.toLowerCase().includes("pago") && !caseData.status.toLowerCase().includes("parcial")) && "bg-emerald-100 text-emerald-700",
+                                caseData.status.toLowerCase().includes("parcialmente") && "bg-blue-100 text-blue-700",
+                                (caseData.status.toLowerCase().includes("análise") || caseData.status.toLowerCase().includes("analise")) && "bg-indigo-100 text-indigo-700",
+                                caseData.status.toLowerCase().includes("cancelado") && "bg-slate-100 text-slate-700"
                             )}>
                                 {caseData.status}
                             </Badge>
@@ -295,8 +296,8 @@ export default function CaseDetailsPage() {
                             <DialogContent className="w-full max-w-[95vw] lg:max-w-7xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
                                 <DialogHeader className="px-6 py-5 border-b flex flex-row items-center justify-between shrink-0">
                                     <div className="flex items-center gap-2">
-                                        <div className="h-8 w-8 rounded-lg bg-orange-100 flex items-center justify-center">
-                                            <Edit className="h-4 w-4 text-orange-600" />
+                                        <div className="h-8 w-8 rounded-lg bg-accent flex items-center justify-center">
+                                            <Edit className="h-4 w-4 text-accent-foreground" />
                                         </div>
                                         <div>
                                             <DialogTitle className="text-lg font-bold">Editar Caso #{caseData.id}</DialogTitle>
@@ -311,8 +312,8 @@ export default function CaseDetailsPage() {
                                         {/* Column 1: Contexto e Prazos (Who & When) */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                                                <Briefcase className="h-4 w-4 text-blue-600" />
-                                                <h3 className="font-bold text-sm text-gray-900">Contexto e Prazos</h3>
+                                                <Briefcase className="h-4 w-4 text-accent-foreground" />
+                                                <h3 className="font-bold text-sm text-foreground">Contexto e Prazos</h3>
                                             </div>
 
                                             {/* Client */}
@@ -384,8 +385,8 @@ export default function CaseDetailsPage() {
                                         {/* Column 2: Detalhes do Lançamento (What) */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                                                <AlignLeft className="h-4 w-4 text-orange-600" />
-                                                <h3 className="font-bold text-sm text-gray-900">Detalhes do Lançamento</h3>
+                                                <AlignLeft className="h-4 w-4 text-accent-foreground" />
+                                                <h3 className="font-bold text-sm text-foreground">Detalhes do Lançamento</h3>
                                             </div>
 
                                             {/* Dynamic Fields */}
@@ -398,17 +399,20 @@ export default function CaseDetailsPage() {
                                                     {Object.keys(editForm)
                                                         .filter(key => {
                                                             const lower = key.toLowerCase();
-                                                            return !lower.includes("inconsist") && !lower.includes("descri") &&
-                                                                !lower.includes("empresa") && !lower.includes("cliente") &&
-                                                                !lower.includes("valor") && !lower.includes("vencimento") &&
-                                                                !lower.includes("respons") && !lower.includes("usuario") &&
-                                                                !lower.includes("status") && !lower.includes("observ") &&
-                                                                !lower.includes("notas") && !lower.includes("data");
+                                                            // Filter out fields already shown elsewhere
+                                                            if (lower.includes("inconsist") || lower.includes("descri") || lower.includes("observ") || lower.includes("nota")) return false; // Descriptions
+                                                            if (lower.includes("empresa") || lower.includes("cliente")) return false; // Client
+                                                            if (lower.includes("respons") || lower.includes("usuario") || lower.includes("usuário")) return false; // Responsible
+                                                            if (isDateColumn(key)) return false; // Dates
+                                                            if (lower === "status") return false; // Status
+                                                            if (isCurrencyColumn(key)) return false; // Financial
+                                                            if (lower.includes("chamado") || lower.includes("caso")) return false; // IDs
+                                                            return true;
                                                         })
                                                         .sort()
                                                         .map((key) => {
                                                             const options = uniqueOptions[key] || [];
-                                                            const useDropdown = options.length > 1 && options.length < 20;
+                                                            const useDropdown = isDropdownColumn(key) && options.length > 0;
                                                             const currentValue = editForm[key] || "";
 
                                                             return (
@@ -446,7 +450,8 @@ export default function CaseDetailsPage() {
                                                             !lower.includes("valor") && !lower.includes("vencimento") &&
                                                             !lower.includes("respons") && !lower.includes("usuario") &&
                                                             !lower.includes("status") && !lower.includes("observ") &&
-                                                            !lower.includes("notas") && !lower.includes("data");
+                                                            !lower.includes("notas") && !lower.includes("data") &&
+                                                            !lower.includes("chamado") && !lower.includes("caso");
                                                     }).length === 0 && (
                                                             <div className="text-sm text-gray-500 italic py-4">Nenhum campo adicional disponível.</div>
                                                         )}
@@ -457,8 +462,8 @@ export default function CaseDetailsPage() {
                                         {/* Column 3: Ação e Financeiro (Impact & Resolution) */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                                                <Wallet className="h-4 w-4 text-emerald-600" />
-                                                <h3 className="font-bold text-sm text-gray-900">Ação e Financeiro</h3>
+                                                <Wallet className="h-4 w-4 text-accent-foreground" />
+                                                <h3 className="font-bold text-sm text-foreground">Ação e Financeiro</h3>
                                             </div>
 
                                             {/* Status (Moved to top of Col 3) */}
@@ -479,9 +484,11 @@ export default function CaseDetailsPage() {
                                                             <SelectItem key={opt} value={opt}>
                                                                 <span className={cn(
                                                                     "font-medium",
-                                                                    opt.toLowerCase() === "pendente" && "text-amber-600",
-                                                                    opt.toLowerCase() === "erro" && "text-red-600",
-                                                                    (opt.toLowerCase() === "concluído" || opt.toLowerCase() === "resolvido" || opt.toLowerCase() === "ok") && "text-emerald-600"
+                                                                    opt.toLowerCase().includes("pendente") && "text-amber-600",
+                                                                    opt.toLowerCase().includes("erro") && "text-red-600",
+                                                                    (opt.toLowerCase().includes("concluído") || opt.toLowerCase().includes("resolvido") || opt.toLowerCase().includes("ok") || (opt.toLowerCase().includes("pago") && !opt.toLowerCase().includes("parcial"))) && "text-emerald-600",
+                                                                    opt.toLowerCase().includes("parcialmente") && "text-blue-600",
+                                                                    opt.toLowerCase().includes("cancelado") && "text-slate-600"
                                                                 )}>
                                                                     {opt}
                                                                 </span>
@@ -552,7 +559,7 @@ export default function CaseDetailsPage() {
                                     </Button>
                                     <Button
                                         onClick={handleSaveEdit}
-                                        className="bg-orange-600 hover:bg-orange-700 text-white flex-1 sm:flex-none shadow-sm"
+                                        className="bg-primary hover:bg-primary/90 text-primary-foreground flex-1 sm:flex-none shadow-sm"
                                     >
                                         <Save className="h-4 w-4 mr-2" />
                                         Salvar Alterações
@@ -561,7 +568,7 @@ export default function CaseDetailsPage() {
                             </DialogContent>
                         </Dialog>
 
-                        <Button className="gap-2 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+                        <Button className="gap-2 font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
                             <CheckCircle className="h-4 w-4" />
                             Finalizar Caso
                         </Button>
@@ -727,7 +734,7 @@ export default function CaseDetailsPage() {
                                     />
                                     <Button
                                         size="icon"
-                                        className="absolute bottom-3 right-3 h-8 w-8 bg-blue-600 hover:bg-blue-700"
+                                        className="absolute bottom-3 right-3 h-8 w-8 bg-primary hover:bg-primary/90 text-primary-foreground"
                                         onClick={handlePostComment}
                                         disabled={!newComment.trim()}
                                     >
@@ -769,8 +776,7 @@ function TimelineItem({ icon, title, time, content, isActive, isRight }: { icon:
     return (
         <div className={cn("relative flex items-center justify-between md:justify-normal group", isRight ? "" : "md:flex-row-reverse")}>
             <div className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-full border border-background shadow shrink-0 z-10 md:absolute md:left-1/2 md:-translate-x-1/2",
-                isActive ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-600 dark:bg-blue-900/40"
+                isActive ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary dark:bg-primary/20"
             )}>
                 {icon}
             </div>

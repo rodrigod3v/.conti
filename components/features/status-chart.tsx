@@ -4,7 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const COLORS = ["#10b981", "#005f73", "#f97316", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899", "#9ca3af"];
+const COLORS = ["#FF8C00", "#1A2B48", "#10b981", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899", "#9ca3af"];
 
 export function StatusChart() {
     const { fileData, headers } = useAppStore();

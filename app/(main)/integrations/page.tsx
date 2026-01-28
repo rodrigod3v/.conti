@@ -20,7 +20,7 @@ export default function IntegrationsPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card className="shadow-sm">
                     <CardHeader className="p-4">
-                        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                             <Grid className="h-5 w-5" />
                         </div>
                         <CardTitle className="text-base">Google Sheets</CardTitle>
@@ -28,7 +28,7 @@ export default function IntegrationsPage() {
                     </CardHeader>
                     <CardContent className="p-4 pt-0">
                         {isConnected ? (
-                            <div className="flex items-center space-x-2 text-emerald-600 mb-4 bg-emerald-50 p-2 rounded-md">
+                            <div className="flex items-center space-x-2 text-primary mb-4 bg-primary/10 p-2 rounded-md">
                                 <Check className="h-4 w-4" />
                                 <span className="text-sm font-medium">Conectado como carlos@cpa.com.br</span>
                             </div>

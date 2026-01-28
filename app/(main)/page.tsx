@@ -37,133 +37,102 @@ export default function Home() {
                 const transformedData = jsonData.map((row: any, index: number) => {
                     const newRow: any = { ...row };
 
-                    // 1. Column Mapping and Normalization
-                    const getVal = (keys: string[]) => {
-                        for (const k of keys) {
-                            if (row[k] !== undefined) return row[k];
-                            const found = Object.keys(row).find(rk => rk.toLowerCase().trim() === k.toLowerCase().trim());
-                            if (found) return row[found];
-                        }
-                        return undefined;
-                    };
+                    // Normalize standard columns if they exist, but don't force them
+                    const findKey = (candidates: string[]) => Object.keys(row).find(k => candidates.some(c => k.toLowerCase().trim() === c.toLowerCase().trim()));
 
-                    // Core Mappings
-                    newRow["Chamado"] = getVal(["observaçao/chamado", "observacao/chamado", "chamado", "caso"]) || row["Chamado"];
-                    newRow["Observações"] = getVal(["observacoes", "observações", "obs"]) || "";
-                    newRow["Status"] = getVal(["status do pgto", "status pagamento", "status"]) || row["Status"];
-                    newRow["Data"] = getVal(["data lançamento", "data lancamento", "data"]) || row["Data"];
-                    newRow["Valor (R$)"] = getVal(["montante", "valor"]) || row["Valor (R$)"];
-                    newRow["Responsável"] = getVal(["responsvel", "responsável", "responsavel"]) || row["Responsável"];
-                    newRow["Inconsistencias"] = getVal(["exeçao", "excecao", "inconsistencias"]) || row["Inconsistencias"];
+                    // Ensure we have a "Chamado" or ID field for links
+                    // User Request: Always use the FIRST item (column) as the ID/Chamado logic.
+                    const rowKeys = Object.keys(row);
+                    const firstKey = rowKeys.length > 0 ? rowKeys[0] : null;
 
-                    // Schema Normalization
-                    const normalize = (target: string, sources: string[]) => {
-                        const val = getVal(sources);
-                        if (val !== undefined) {
-                            newRow[target] = val;
-                            // Clean up source keys from newRow to avoid duplicates
-                            sources.forEach(sourceKey => {
-                                // Try exact delete
-                                delete newRow[sourceKey];
-                                // Try fuzzy delete
-                                const foundKey = Object.keys(newRow).find(
-                                    k => k.trim().toLowerCase() === sourceKey.trim().toLowerCase()
-                                );
-                                if (foundKey) delete newRow[foundKey];
-                            });
-                        }
-                    };
+                    if (firstKey) {
+                        // Use the first column as the ID source logic
+                        // We KEEP the original key (e.g. "Id do Pedido") so it displays correctly headers
+                        // But we also ensure "Chamado" exists for internal routing/logic (hidden id)
+                        newRow["Chamado"] = row[firstKey];
 
-                    normalize("Area Responsavel", ["area responsavel"]);
-                    normalize("Data do Pgto", ["data do pgto", "data pagamento"]);
-                    normalize("Empresa", ["empresa"]);
-                    normalize("Fornecedor", ["fornecedor"]);
-                    normalize("Nome do Fornecedor", ["nome do fornecedor"]);
-                    normalize("Referencia", ["referencia"]);
-                    normalize("Ordem", ["ordem"]);
-                    normalize("Lancamento", ["lancamento", "lançamento"]);
-                    normalize("Forma de Pgto", ["forma de pagamento", "forma de pgto"]);
-                    normalize("Data Lanç Contab", ["data lançamento contabil", "data lancamento contabil", "data lanç contab"]);
-                    normalize("Data Vencimento", ["data vencimento"]);
-                    normalize("Valor Liquido", ["valor liquido"]);
-                    normalize("Texto de Item", ["texto de item"]);
-                    normalize("№ ID Fiscal", ["numero do id fiscal", "no id fiscal", "№ id fiscal"]);
-                    normalize("Exercicio", ["exercido", "exercicio"]);
-                    normalize("Bloq Pgto Item", ["bloqueio pagamento item", "bloq pgto item"]);
-                    normalize("Tp Lanç Cont", ["tipo lancamento contabil", "tp lanç cont"]);
-                    normalize("PCC", ["PCC"]);
-                    normalize("IR", ["IR"]);
-                    normalize("Base ISS", ["Base ISS"]);
+                        // We DO NOT delete the original key anymore.
+                    } else {
+                        // Fallback if row is empty (unlikely given check)
+                        let year = new Date().getFullYear();
+                        const padIndex = String(index + 1).padStart(3, '0');
+                        newRow["Chamado"] = `CS-${year}-${padIndex}`;
+                    }
 
-                    // Date Formatting Helper
-                    const formatDate = (key: string) => {
-                        if (newRow[key]) {
+                    // Format Dates if found
+                    Object.keys(newRow).forEach(key => {
+                        const lowerKey = key.toLowerCase();
+                        if (lowerKey.includes("data") || lowerKey === "vencimento") {
                             let rawDate = newRow[key];
-                            const numericDate = parseFloat(String(rawDate));
-                            if (!isNaN(numericDate) && numericDate > 20000 && String(rawDate).match(/^\d+(\.\d+)?$/)) {
-                                const dateObj = new Date((numericDate - 25569) * 86400 * 1000);
+                            const strDate = String(rawDate).trim();
+
+                            // 1. Check for Excel serial date
+                            const numericDate = parseFloat(strDate);
+                            if (!isNaN(numericDate) && numericDate > 20000 && strDate.match(/^\d+(\.\d+)?$/)) {
+                                const dateObj = new Date((numericDate - 25569) * 86400 * 1000 + 43200000);
                                 const day = String(dateObj.getUTCDate()).padStart(2, '0');
                                 const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
                                 const year = dateObj.getUTCFullYear();
                                 newRow[key] = `${day}/${month}/${year}`;
                             }
-                        }
-                    };
-
-                    // Apply date formatting
-                    formatDate("Data");
-                    formatDate("Data do Pgto");
-                    formatDate("Data Lanç Contab");
-                    formatDate("Data Vencimento");
-
-                    // Clean up old specific maps logic to avoid duplication
-                    delete newRow["Dia"];
-                    delete newRow["Quantidade"];
-                    delete newRow["Responsavel"];
-                    delete newRow["Caso"]; // Ensure old key is gone if present
-
-                    // 2. Status Logic based on 'Inconsistencias'
-                    if (row["Inconsistencias"] && String(row["Inconsistencias"]).trim() !== "") {
-                        newRow["Status"] = "Erro";
-                        // Ensure Inconsistencias is preserved if not already
-                        newRow["Inconsistencias"] = row["Inconsistencias"];
-                    }
-
-                    // 3. Status Badge Normalization (Optional but good for consistency)
-                    // If Status is 'Pendente', keep it.
-
-                    // 4. Generate Case ID if missing
-                    if (!newRow["Chamado"]) {
-                        // Generate a simple ID based on date or generic counter
-                        // Try to extract year from Data if available
-                        let year = new Date().getFullYear();
-                        if (newRow["Data"]) {
-                            // Try to parse DD/MM/YYYY or YYYY-MM-DD
-                            // Simple check:
-                            const parts = String(newRow["Data"]).split(/[-/]/);
-                            if (parts.length === 3) {
-                                // Assuming Year is usually last in pt-BR (DD/MM/YYYY) or first in ISO
-                                if (parts[0].length === 4) year = parseInt(parts[0]);
-                                else if (parts[2].length === 4) year = parseInt(parts[2]);
+                            // 2. Check for ISO Date (YYYY-MM-DD)
+                            else if (strDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                                const [year, month, day] = strDate.split('-');
+                                newRow[key] = `${day}/${month}/${year}`;
                             }
+                            // 3. Check for ISO Date with Time (YYYY-MM-DDTHH:mm...)
+                            else if (strDate.match(/^\d{4}-\d{2}-\d{2}T/)) {
+                                const dateObj = new Date(strDate);
+                                if (!isNaN(dateObj.getTime())) {
+                                    const day = String(dateObj.getDate()).padStart(2, '0');
+                                    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                    const year = dateObj.getFullYear();
+                                    newRow[key] = `${day}/${month}/${year}`;
+                                }
+                            }
+                            // 4. Leave DD/MM/YYYY as is, or try standard Date parse fallback?
+                            // If it's something like MM/DD/YYYY we might be in trouble without user hint, 
+                            // but let's assume if it is NOT YYYY-MM-DD and not numeric, it might be correct or just text.
                         }
-                        // Format: CS-{Year}-{Index padded}
-                        // Using global index might be tricky if we don't know the last DB index. 
-                        // ideally we'd need a sequence from DB. 
-                        // For now, generating a temporary unique ID for the session/file import.
-                        // To make it look realistic: CS-2023-{random/index}
-                        const padIndex = String(index + 1).padStart(3, '0');
-                        newRow["Chamado"] = `CS-${year}-${padIndex}`;
-                    }
+                    });
 
                     return newRow;
                 });
 
-                // Forced Header Ordering
-                // Chamado first, Observações second, then rest
-                const baseHeaders = ["Chamado", "Observações"];
-                const otherHeaders = Object.keys(transformedData[0] as object).filter(h => !baseHeaders.includes(h));
-                const headers = [...baseHeaders, ...otherHeaders];
+                // Headers Logic
+                // We want to show all Original Keys.
+                // We typically exclude "Chamado" from display if it was auto-generated or duplicated from first key, 
+                // UNLESS "Chamado" was actually the name of the first key.
+                const allKeys = Array.from(new Set(transformedData.flatMap(row => Object.keys(row))));
+
+                // Filter out "Chamado" if we have another key that is acting as the ID (the first key).
+                // Or simply: Use the keys from the first row of original data? 
+                // Better: Filter out "Chamado" if it's not in the original file's header set?
+                // But we don't have original header set easily here due to flatMap.
+                // Let's rely on checking if "Chamado" is strictly needed.
+
+                // If the user uploaded a file with "Chamado", keep it.
+                // If we generated "Chamado" as a dupe of "Id do Pedido", hide it.
+                // Simple heuristic: If "Chamado" is NOT the first key of the new rows (which might be "Id do Pedido" + "Chamado"), hide it?
+                // actually transformedData row keys order might be mixed.
+
+                // Best bet: Filter "Chamado" if "Chamado" is DIFFERENT from the link value source key?
+                // Simpler: Just exclude "Chamado" from headers if `jsonData` keys didn't include it?
+                const originalKeys = Object.keys(jsonData[0] || {});
+                const hasOriginalChamado = originalKeys.some(k => k.trim().toLowerCase() === "chamado");
+
+                const visibleHeaders = allKeys.filter(k => {
+                    if (k === "Chamado" && !hasOriginalChamado) return false;
+                    return true;
+                });
+
+                // Sort: First Key First (ID), then others
+                // We need to identify the "First Key" across rows or just take visibleHeaders and likely original order.
+                // Original order is best preserved from originalKeys.
+                const sortedHeaders = [
+                    ...originalKeys.filter(k => visibleHeaders.includes(k)), // Keep original order
+                    ...visibleHeaders.filter(k => !originalKeys.includes(k)) // Append any new ones (unlikely besides formatted)
+                ];
 
                 // Save to Database
                 try {
@@ -181,7 +150,7 @@ export default function Home() {
 
                     const savedFile = await response.json();
                     // Update store with new file ID (for Data Editor context)
-                    setFileData(transformedData, headers, file.name); // Using local data for immediate feedback, but could fetch
+                    setFileData(transformedData, sortedHeaders, file.name, savedFile.id);
                     // Ideally store the savedFile.id in the store too
                 } catch (dbError) {
                     console.error("Erro de persistência:", dbError);
@@ -235,7 +204,7 @@ export default function Home() {
                     <Button
                         variant="outline"
                         onClick={downloadTemplate}
-                        className="gap-2 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800"
+                        className="gap-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary"
                     >
                         <Download className="h-4 w-4" />
                         Baixar Modelo CSV

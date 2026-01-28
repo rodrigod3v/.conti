@@ -33,10 +33,10 @@ export function KpiCards() {
             title: "Total de Casos",
             value: total.toString(),
             badge: total > 0 ? "100%" : "0%",
-            badgeColor: "bg-emerald-50 text-emerald-700",
+            badgeColor: "bg-primary/10 text-primary",
             icon: FileSpreadsheet,
-            iconColor: "text-blue-600",
-            iconBg: "bg-blue-100",
+            iconColor: "text-primary",
+            iconBg: "bg-primary/10",
         },
         {
             title: "Pendentes",
