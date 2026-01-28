@@ -71,3 +71,15 @@ backup_production.db
 *.key
 *.pem
 *.pub
+*.ppk
+id_rsa
+id_rsa.pub
+
+# deployment scripts
+do_deploy.ps1
+fix_*.ps1
+setup_vm.sh
+
+# compressed project files
+*.tar.gz
+project.tar.gz

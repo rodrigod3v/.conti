@@ -6,7 +6,7 @@ import { RecentHistory } from "@/components/features/recent-history";
 import { Calendar, Download } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
-import { read, utils } from "xlsx";
+import ExcelJS from "exceljs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/simple-toast";
 
@@ -20,19 +20,57 @@ export default function Home() {
         try {
             const buffer = await file.arrayBuffer();
             let jsonData: any[] = [];
-            let workbook;
 
-            // Ensure UTF-8 for CSVs
+            // Handle CSV files
             if (file.name.endsWith(".csv") || file.type === "text/csv") {
                 const textDecoder = new TextDecoder("utf-8");
                 const text = textDecoder.decode(buffer);
-                workbook = read(text, { type: "string" });
+                const lines = text.split('\n').filter(line => line.trim());
+                if (lines.length > 0) {
+                    const headers = lines[0].split(',').map(h => h.trim());
+                    jsonData = lines.slice(1).map(line => {
+                        const values = line.split(',');
+                        const row: any = {};
+                        headers.forEach((header, index) => {
+                            row[header] = values[index]?.trim() || '';
+                        });
+                        return row;
+                    });
+                }
             } else {
-                workbook = read(buffer);
-            }
+                // Handle Excel files with ExcelJS
+                const workbook = new ExcelJS.Workbook();
+                await workbook.xlsx.load(buffer);
+                const worksheet = workbook.worksheets[0];
 
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            jsonData = utils.sheet_to_json(worksheet);
+                const headers: string[] = [];
+                const headerRow = worksheet.getRow(1);
+                headerRow.eachCell((cell, colNumber) => {
+                    headers.push(cell.value?.toString() || `Column${colNumber}`);
+                });
+
+                worksheet.eachRow((row, rowNumber) => {
+                    if (rowNumber > 1) {
+                        const rowData: any = {};
+                        row.eachCell((cell, colNumber) => {
+                            const header = headers[colNumber - 1];
+                            if (header) {
+                                let cellValue: any = cell.value;
+                                if (cellValue && typeof cellValue === 'object' && 'result' in cellValue) {
+                                    cellValue = cellValue.result;
+                                }
+                                if (cellValue && typeof cellValue === 'object' && 'richText' in cellValue) {
+                                    cellValue = (cellValue as any).richText.map((rt: any) => rt.text).join('');
+                                }
+                                rowData[header] = cellValue;
+                            }
+                        });
+                        if (Object.values(rowData).some(val => val !== null && val !== undefined && val !== '')) {
+                            jsonData.push(rowData);
+                        }
+                    }
+                });
+            }
 
             if (jsonData.length > 0) {
                 // Transformation Logic
