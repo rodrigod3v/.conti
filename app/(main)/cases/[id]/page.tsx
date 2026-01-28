@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { isDropdownColumn, isDateColumn, isCurrencyColumn, isObservationColumn } from "@/lib/column-utils";
+import { isDropdownColumn, isDateColumn, isCurrencyColumn, isNumericColumn, isObservationColumn } from "@/lib/column-utils";
 
 
 
@@ -74,19 +74,24 @@ export default function CaseDetailsPage() {
 
 
     const caseData = useMemo(() => {
-        // Helper to get value case-insensitively
-        const getValue = (r: any, ...keys: string[]) => {
-            for (const key of keys) {
+        // Helper to find the actual column name from candidates
+        const findKey = (r: any, ...candidates: string[]): string | null => {
+            for (const candidate of candidates) {
                 // Exact match first
-                if (r[key] !== undefined) return r[key];
+                if (r[candidate] !== undefined) return candidate;
 
-                // Try case insensitive and trimmed match
-                const normalizedSearch = key.trim().toLowerCase();
-                const foundKey = Object.keys(r).find(k => k.trim().toLowerCase() === normalizedSearch);
-
-                if (foundKey && r[foundKey] !== undefined) return r[foundKey];
+                // Case-insensitive match
+                const normalized = candidate.trim().toLowerCase();
+                const found = Object.keys(r).find(k => k.trim().toLowerCase() === normalized);
+                if (found) return found;
             }
             return null;
+        };
+
+        // Helper to get value using findKey
+        const getValue = (r: any, ...keys: string[]) => {
+            const key = findKey(r, ...keys);
+            return key ? r[key] : null;
         };
 
         const rowIndex = fileData.findIndex(r => {
@@ -106,37 +111,59 @@ export default function CaseDetailsPage() {
         if (rowIndex === -1) return null;
         const row = fileData[rowIndex];
 
-        const status = String(getValue(row, "Status", "status") || "Pendente");
-        const descriptionField = ["Inconsistencias", "inconsistencias", "Descrição", "descricao", "Observações", "observacoes"].find(k => row[k] !== undefined) || "Inconsistencias";
+        // Track source keys for all standard fields
+        const clientKey = findKey(row, "Empresa", "empresa", "Cliente", "cliente", "Nome do Fornecedor", "Fornecedor");
+        const responsibleKey = findKey(row, "Responsável", "responsavel", "Usuario", "usuario", "Area Responsavel");
+        const openedAtKey = findKey(row, "Data", "data", "Data Abertura");
+        const dueDateKey = findKey(row, "Data Vencimento", "vencimento");
+        const statusKey = findKey(row, "Status", "status");
 
-        // Dynamic Fields (Leftover)
-        const knownKeys = [
-            "Caso", "Chamado", "caso", "chamado",
-            "Inconsistencias", "inconsistencias", "Descrição", "descricao", "Observações", "observacoes",
-            "Status", "status",
-            "Empresa", "empresa", "Cliente", "cliente", "Nome do Fornecedor", "Fornecedor",
-            "Responsável", "responsavel", "Usuario", "usuario", "Area Responsavel",
-            "Exercicio", "exercicio", "Periodo", "periodo",
-            "Data", "data", "Data Abertura",
-            "Data Vencimento", "vencimento",
-            "Valor (R$)", "Valor", "montante",
-            "Valor Liquido", "valor liquido",
-            "Forma de Pagamento", "forma pagamento", "Forma Pagto", "Metodo Pagamento", "FORMA DE PGTO",
-            "PCC", "pcc", "PCC", "pcc",
-            "IR", "ir", "IRRF", "Imposto de Renda",
-            "Base ISS", "base iss"
-        ];
+        // Expanded value field matchers - includes "Valor Total", "Total", "Valor Bruto"
+        const valueKey = findKey(row,
+            "Valor (R$)", "Valor", "valor", "montante", "Montante",
+            "Valor Total", "valor total", "Total", "total", "Valor Bruto", "valor bruto"
+        );
+        const netValueKey = findKey(row, "Valor Liquido", "valor liquido", "Valor Líquido");
+        const paymentMethodKey = findKey(row,
+            "Forma de Pagamento", "forma pagamento", "Forma Pagto", "Metodo Pagamento", "FORMA DE PGTO"
+        );
 
+        // Other financial keys
+        const pccKey = findKey(row, "PCC", "pcc");
+        const irKey = findKey(row, "IR", "ir", "IRRF", "Imposto de Renda");
+        const issBaseKey = findKey(row, "Base ISS", "base iss");
+
+        // Period/Exercise
+        const periodKey = findKey(row, "Exercicio", "exercicio", "Periodo", "periodo");
+
+        // Description field
+        const descriptionField = findKey(row, "Inconsistencias", "inconsistencias", "Descrição", "descricao", "Observações", "observacoes") || "Inconsistencias";
+
+        // Build tracked keys set for "Outros Campos" exclusion
+        const trackedKeys = [
+            clientKey, responsibleKey, openedAtKey, dueDateKey, statusKey,
+            valueKey, netValueKey, paymentMethodKey, pccKey, irKey, issBaseKey,
+            periodKey, descriptionField
+        ].filter(Boolean); // Remove nulls
+
+        // Dynamic Fields (Outros Campos) - use strict key-based exclusions
         const otherFields: { label: string, value: string }[] = [];
         Object.keys(row).forEach(key => {
-            const normalizedKey = key.trim().toLowerCase();
-            if (!knownKeys.some(k => k.trim().toLowerCase() === normalizedKey)) {
-                const val = row[key];
-                if (val !== undefined && val !== null && String(val).trim() !== "") {
-                    otherFields.push({ label: key, value: String(val) });
-                }
+            // Exclude tracked keys
+            if (trackedKeys.includes(key)) return;
+
+            // Exclude ID fields
+            const lower = key.toLowerCase();
+            if (lower === "id" || lower === "chamado" || lower === "caso") return;
+            if (lower.includes(" id ") || lower.startsWith("id ") || lower.endsWith(" id")) return;
+
+            const val = row[key];
+            if (val !== undefined && val !== null && String(val).trim() !== "") {
+                otherFields.push({ label: key, value: String(val) });
             }
         });
+
+        const status = statusKey ? String(row[statusKey] || "Pendente") : "Pendente";
 
         return {
             rowIndex,
@@ -144,33 +171,47 @@ export default function CaseDetailsPage() {
             title: getValue(row, "Inconsistencias", "inconsistencias", "Descrição", "descricao")
                 ? "Inconsistência Identificada"
                 : String(getValue(row, "Caso", "Chamado", "caso", "chamado") || caseId),
-            description: String(getValue(row, descriptionField) || ""),
+            description: String(row[descriptionField] || ""),
             descriptionField,
             status: status,
 
-            // General Info - ONLY render if they exist
-            client: String(getValue(row, "Empresa", "empresa", "Cliente", "cliente") || getValue(row, "Nome do Fornecedor", "Fornecedor") || ""),
-            responsible: String(getValue(row, "Responsável", "responsavel", "Usuario", "usuario", "Area Responsavel") || ""),
+            // Source keys for dynamic form binding
+            clientKey,
+            responsibleKey,
+            openedAtKey,
+            dueDateKey,
+            statusKey,
+            valueKey,
+            netValueKey,
+            paymentMethodKey,
+            pccKey,
+            irKey,
+            issBaseKey,
+            periodKey,
+
+            // Values (using the keys)
+            client: clientKey ? String(row[clientKey] || "") : "",
+            responsible: responsibleKey ? String(row[responsibleKey] || "") : "",
             priority: status.toLowerCase() === "erro" || status.toLowerCase() === "alto" ? "Alta" : "Normal",
-            period: getValue(row, "Exercicio", "exercicio", "Periodo", "periodo") ? `Exercício ${getValue(row, "Exercicio", "exercicio")}` : "",
+            period: periodKey ? `Exercício ${row[periodKey]}` : "",
 
             // Dates
-            openedAt: String(getValue(row, "Data", "data", "Data Abertura") || ""),
-            dueDate: String(getValue(row, "Data Vencimento", "vencimento") || ""),
+            openedAt: openedAtKey ? String(row[openedAtKey] || "") : "",
+            dueDate: dueDateKey ? String(row[dueDateKey] || "") : "",
 
             // Financial
-            value: getValue(row, "Valor (R$)", "Valor", "montante"),
-            netValue: getValue(row, "Valor Liquido", "valor liquido"),
-            paymentMethod: String(getValue(row, "Forma de Pagamento", "forma pagamento", "Forma Pagto", "Metodo Pagamento") || ""),
-            pcc: getValue(row, "PCC", "pcc"),
-            ir: getValue(row, "IR", "ir", "IRRF", "Imposto de Renda"),
-            issBase: getValue(row, "Base ISS", "base iss"),
+            value: valueKey ? row[valueKey] : null,
+            netValue: netValueKey ? row[netValueKey] : null,
+            paymentMethod: paymentMethodKey ? String(row[paymentMethodKey] || "") : "",
+            pcc: pccKey ? row[pccKey] : null,
+            ir: irKey ? row[irKey] : null,
+            issBase: issBaseKey ? row[issBaseKey] : null,
 
             otherFields,
             // DEBUG: Return raw row keys for finding the correct column names
             debugKeys: Object.keys(row).sort()
         };
-    }, [caseId, fileData]);
+    }, [caseId, fileData, headers]);
 
     // Calculate unique values for ALL columns
     const uniqueOptions = useMemo(() => {
@@ -331,69 +372,69 @@ export default function CaseDetailsPage() {
                                                 <h3 className="font-bold text-sm text-foreground">Contexto e Prazos</h3>
                                             </div>
 
-                                            {/* Client */}
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Cliente / Empresa</Label>
-                                                <Input
-                                                    value={editForm["Empresa"] || editForm["Cliente"] || ""}
-                                                    onChange={(e) => {
-                                                        const key = Object.keys(editForm).find(k => k.toLowerCase().includes("empresa") || k.toLowerCase().includes("cliente"));
-                                                        if (key) setEditForm({ ...editForm, [key]: e.target.value });
-                                                    }}
-                                                    className="border-gray-300"
-                                                />
-                                            </div>
+                                            {/* Client - Only if clientKey exists */}
+                                            {caseData.clientKey && (
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">
+                                                        {caseData.clientKey}
+                                                    </Label>
+                                                    <Input
+                                                        value={editForm[caseData.clientKey] || ""}
+                                                        onChange={(e) => setEditForm({ ...editForm, [caseData.clientKey!]: e.target.value })}
+                                                        className="border-gray-300"
+                                                    />
+                                                </div>
+                                            )}
 
-                                            {/* Responsible */}
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Responsável</Label>
-                                                <Select
-                                                    value={editForm["Responsável"] || editForm["Usuario"] || ""}
-                                                    onValueChange={(val) => {
-                                                        const key = Object.keys(editForm).find(k => k.toLowerCase().includes("respons") || k.toLowerCase().includes("usuario"));
-                                                        if (key) setEditForm({ ...editForm, [key]: val });
-                                                    }}
-                                                >
-                                                    <SelectTrigger className="border-gray-300">
-                                                        <SelectValue placeholder="Selecione o responsável" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {(uniqueOptions["Responsável"] || uniqueOptions["Usuario"] || []).map((opt) => (
-                                                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                            {/* Responsible - Only if responsibleKey exists */}
+                                            {caseData.responsibleKey && (
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Responsável</Label>
+                                                    <Select
+                                                        value={editForm[caseData.responsibleKey] || ""}
+                                                        onValueChange={(val) => setEditForm({ ...editForm, [caseData.responsibleKey!]: val })}
+                                                    >
+                                                        <SelectTrigger className="border-gray-300">
+                                                            <SelectValue placeholder="Selecione o responsável" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {(uniqueOptions[caseData.responsibleKey] || []).map((opt) => (
+                                                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
 
-                                            <Separator />
+                                            {(caseData.openedAtKey || caseData.dueDateKey) && <Separator />}
 
                                             {/* Dates (Moved from old Col 2) */}
                                             <div className="grid grid-cols-1 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Data Abertura</Label>
-                                                    <Input
-                                                        value={editForm["Data"] || editForm["Data Abertura"] || ""}
-                                                        onChange={(e) => {
-                                                            const key = Object.keys(editForm).find(k => k.toLowerCase() === "data" || k.toLowerCase() === "data abertura");
-                                                            if (key) setEditForm({ ...editForm, [key]: e.target.value });
-                                                        }}
-                                                        className="border-gray-300"
-                                                        placeholder="DD/MM/AAAA"
-                                                    />
-                                                </div>
+                                                {/* Data Abertura - Only if openedAtKey exists */}
+                                                {caseData.openedAtKey && (
+                                                    <div className="space-y-2">
+                                                        <Label className="text-xs font-semibold text-gray-600 uppercase">Data Abertura</Label>
+                                                        <Input
+                                                            value={editForm[caseData.openedAtKey] || ""}
+                                                            onChange={(e) => setEditForm({ ...editForm, [caseData.openedAtKey!]: e.target.value })}
+                                                            className="border-gray-300"
+                                                            placeholder="DD/MM/AAAA"
+                                                        />
+                                                    </div>
+                                                )}
 
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Vencimento</Label>
-                                                    <Input
-                                                        value={editForm["Data Vencimento"] || editForm["vencimento"] || ""}
-                                                        onChange={(e) => {
-                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("vencimento"));
-                                                            if (key) setEditForm({ ...editForm, [key]: e.target.value });
-                                                        }}
-                                                        className="border-gray-300"
-                                                        placeholder="DD/MM/AAAA"
-                                                    />
-                                                </div>
+                                                {/* Vencimento - Only if dueDateKey exists */}
+                                                {caseData.dueDateKey && (
+                                                    <div className="space-y-2">
+                                                        <Label className="text-xs font-semibold text-gray-600 uppercase">Vencimento</Label>
+                                                        <Input
+                                                            value={editForm[caseData.dueDateKey] || ""}
+                                                            onChange={(e) => setEditForm({ ...editForm, [caseData.dueDateKey!]: e.target.value })}
+                                                            className="border-gray-300"
+                                                            placeholder="DD/MM/AAAA"
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -413,18 +454,33 @@ export default function CaseDetailsPage() {
                                                 <div className="grid grid-cols-1 gap-4 pr-2 max-h-[300px] overflow-y-auto">
                                                     {Object.keys(editForm)
                                                         .filter(key => {
-                                                            const lower = key.toLowerCase();
-                                                            // Filter out fields already shown elsewhere
-                                                            if (lower.includes("inconsist") || lower.includes("descri") || lower.includes("observ") || lower.includes("nota")) return false; // Descriptions
-                                                            if (lower.includes("empresa") || lower.includes("cliente")) return false; // Client
-                                                            if (lower.includes("respons") || lower.includes("usuario") || lower.includes("usuário")) return false; // Responsible
-                                                            if (isDateColumn(key)) return false; // Dates
-                                                            if (lower === "status") return false; // Status
-                                                            if (isCurrencyColumn(key)) return false; // Financial
+                                                            // Build list of tracked keys to exclude
+                                                            const trackedKeys = [
+                                                                caseData.clientKey,
+                                                                caseData.responsibleKey,
+                                                                caseData.openedAtKey,
+                                                                caseData.dueDateKey,
+                                                                caseData.statusKey,
+                                                                caseData.valueKey,
+                                                                caseData.netValueKey,
+                                                                caseData.paymentMethodKey,
+                                                                caseData.pccKey,
+                                                                caseData.irKey,
+                                                                caseData.issBaseKey,
+                                                                caseData.periodKey,
+                                                                caseData.descriptionField,
+                                                            ].filter(Boolean); // Remove nulls
 
-                                                            // Strict ID Filtering
-                                                            if (lower === "id" || lower === "chamado" || lower === "caso" || lower.includes(" id ")) return false;
-                                                            if (lower.startsWith("id ") || lower.endsWith(" id")) return false;
+                                                            // Exclude tracked keys
+                                                            if (trackedKeys.includes(key)) return false;
+
+                                                            // Exclude ID fields
+                                                            const lower = key.toLowerCase();
+                                                            if (lower === "id" || lower === "chamado" || lower === "caso") return false;
+                                                            if (lower.includes(" id ") || lower.startsWith("id ") || lower.endsWith(" id")) return false;
+
+                                                            // Exclude observation/notes fields (shown in Quick Notes)
+                                                            if (lower.includes("observ") || lower.includes("nota")) return false;
 
                                                             return true;
                                                         })
@@ -432,7 +488,8 @@ export default function CaseDetailsPage() {
                                                         .map((key) => {
                                                             const options = uniqueOptions[key] || [];
                                                             // Smart Dropdown Logic: Use dropdown if explicitly defined OR if it has few unique options (< 20)
-                                                            const useDropdown = (isDropdownColumn(key) || (options.length > 0 && options.length <= 20));
+                                                            // BUT never use dropdown for date, currency, or numeric fields
+                                                            const useDropdown = !isDateColumn(key) && !isCurrencyColumn(key) && !isNumericColumn(key) && (isDropdownColumn(key) || (options.length > 0 && options.length <= 20));
                                                             const currentValue = editForm[key] || "";
 
                                                             return (
@@ -464,15 +521,30 @@ export default function CaseDetailsPage() {
                                                         })}
                                                     {/* Empty state if no extra fields */}
                                                     {Object.keys(editForm).filter(key => {
+                                                        const trackedKeys = [
+                                                            caseData.clientKey,
+                                                            caseData.responsibleKey,
+                                                            caseData.openedAtKey,
+                                                            caseData.dueDateKey,
+                                                            caseData.statusKey,
+                                                            caseData.valueKey,
+                                                            caseData.netValueKey,
+                                                            caseData.paymentMethodKey,
+                                                            caseData.pccKey,
+                                                            caseData.irKey,
+                                                            caseData.issBaseKey,
+                                                            caseData.periodKey,
+                                                            caseData.descriptionField,
+                                                        ].filter(Boolean);
+
+                                                        if (trackedKeys.includes(key)) return false;
+
                                                         const lower = key.toLowerCase();
-                                                        return !lower.includes("inconsist") && !lower.includes("descri") &&
-                                                            !lower.includes("empresa") && !lower.includes("cliente") &&
-                                                            !lower.includes("valor") && !lower.includes("vencimento") &&
-                                                            !lower.includes("respons") && !lower.includes("usuario") &&
-                                                            !lower.includes("status") && !lower.includes("observ") &&
-                                                            !lower.includes("notas") && !lower.includes("data") &&
-                                                            !lower.includes("chamado") && !lower.includes("caso") &&
-                                                            lower !== "id" && !lower.includes(" id ") && !lower.startsWith("id ") && !lower.endsWith(" id");
+                                                        if (lower === "id" || lower === "chamado" || lower === "caso") return false;
+                                                        if (lower.includes(" id ") || lower.startsWith("id ") || lower.endsWith(" id")) return false;
+                                                        if (lower.includes("observ") || lower.includes("nota")) return false;
+
+                                                        return true;
                                                     }).length === 0 && (
                                                             <div className="text-sm text-gray-500 italic py-4">Nenhum campo adicional disponível.</div>
                                                         )}
@@ -487,72 +559,69 @@ export default function CaseDetailsPage() {
                                                 <h3 className="font-bold text-sm text-foreground">Ação e Financeiro</h3>
                                             </div>
 
-                                            {/* Status (Moved to top of Col 3) */}
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-gray-600 uppercase">Status</Label>
-                                                <Select
-                                                    value={editForm["Status"] || editForm["status"] || ""}
-                                                    onValueChange={(val) => {
-                                                        const key = Object.keys(editForm).find(k => k.toLowerCase() === "status");
-                                                        if (key) setEditForm({ ...editForm, [key]: val });
-                                                    }}
-                                                >
-                                                    <SelectTrigger className="border-gray-300 bg-gray-50/50">
-                                                        <SelectValue placeholder="Selecione o status" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {(uniqueOptions["Status"] || uniqueOptions["status"] || ["Pendente", "Em Andamento", "Concluído"]).map((opt) => (
-                                                            <SelectItem key={opt} value={opt}>
-                                                                <span className={cn(
-                                                                    "font-medium",
-                                                                    opt.toLowerCase().includes("pendente") && "text-amber-600",
-                                                                    opt.toLowerCase().includes("erro") && "text-red-600",
-                                                                    (opt.toLowerCase().includes("concluído") || opt.toLowerCase().includes("resolvido") || opt.toLowerCase().includes("ok") || (opt.toLowerCase().includes("pago") && !opt.toLowerCase().includes("parcial"))) && "text-emerald-600",
-                                                                    opt.toLowerCase().includes("parcialmente") && "text-blue-600",
-                                                                    opt.toLowerCase().includes("cancelado") && "text-slate-600"
-                                                                )}>
-                                                                    {opt}
-                                                                </span>
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                            {/* Status - Only if statusKey exists */}
+                                            {caseData.statusKey && (
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Status</Label>
+                                                    <Select
+                                                        value={editForm[caseData.statusKey] || ""}
+                                                        onValueChange={(val) => setEditForm({ ...editForm, [caseData.statusKey!]: val })}
+                                                    >
+                                                        <SelectTrigger className="border-gray-300 bg-gray-50/50">
+                                                            <SelectValue placeholder="Selecione o status" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {(uniqueOptions[caseData.statusKey] || ["Pendente", "Em Andamento", "Concluído"]).map((opt) => (
+                                                                <SelectItem key={opt} value={opt}>
+                                                                    <span className={cn(
+                                                                        "font-medium",
+                                                                        opt.toLowerCase().includes("pendente") && "text-amber-600",
+                                                                        opt.toLowerCase().includes("erro") && "text-red-600",
+                                                                        (opt.toLowerCase().includes("concluído") || opt.toLowerCase().includes("resolvido") || opt.toLowerCase().includes("ok") || (opt.toLowerCase().includes("pago") && !opt.toLowerCase().includes("parcial"))) && "text-emerald-600",
+                                                                        opt.toLowerCase().includes("parcialmente") && "text-blue-600",
+                                                                        opt.toLowerCase().includes("cancelado") && "text-slate-600"
+                                                                    )}>
+                                                                        {opt}
+                                                                    </span>
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
 
                                             {/* Financial Values */}
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Valor (R$)</Label>
-                                                    <Input
-                                                        value={editForm["Valor (R$)"] || editForm["Valor"] || ""}
-                                                        onChange={(e) => {
-                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("valor") && !k.toLowerCase().includes("liquido"));
-                                                            if (key) setEditForm({ ...editForm, [key]: e.target.value });
-                                                        }}
-                                                        onBlur={(e) => {
-                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("valor") && !k.toLowerCase().includes("liquido"));
-                                                            if (key) handleCurrencyBlur(key, e.target.value);
-                                                        }}
-                                                        className="border-gray-300 font-mono"
-                                                    />
-                                                </div>
+                                            {(caseData.valueKey || caseData.netValueKey) && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {/* Valor (R$) - Only if valueKey exists */}
+                                                    {caseData.valueKey && (
+                                                        <div className="space-y-2">
+                                                            <Label className="text-xs font-semibold text-gray-600 uppercase">
+                                                                {caseData.valueKey}
+                                                            </Label>
+                                                            <Input
+                                                                value={editForm[caseData.valueKey] || ""}
+                                                                onChange={(e) => setEditForm({ ...editForm, [caseData.valueKey!]: e.target.value })}
+                                                                onBlur={(e) => handleCurrencyBlur(caseData.valueKey!, e.target.value)}
+                                                                className="border-gray-300 font-mono"
+                                                            />
+                                                        </div>
+                                                    )}
 
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Valor Líquido</Label>
-                                                    <Input
-                                                        value={editForm["Valor Liquido"] || editForm["valor liquido"] || ""}
-                                                        onChange={(e) => {
-                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("liquido"));
-                                                            if (key) setEditForm({ ...editForm, [key]: e.target.value });
-                                                        }}
-                                                        onBlur={(e) => {
-                                                            const key = Object.keys(editForm).find(k => k.toLowerCase().includes("liquido"));
-                                                            if (key) handleCurrencyBlur(key, e.target.value);
-                                                        }}
-                                                        className="border-gray-300 font-mono"
-                                                    />
+                                                    {/* Valor Líquido - Only if netValueKey exists */}
+                                                    {caseData.netValueKey && (
+                                                        <div className="space-y-2">
+                                                            <Label className="text-xs font-semibold text-gray-600 uppercase">Valor Líquido</Label>
+                                                            <Input
+                                                                value={editForm[caseData.netValueKey] || ""}
+                                                                onChange={(e) => setEditForm({ ...editForm, [caseData.netValueKey!]: e.target.value })}
+                                                                onBlur={(e) => handleCurrencyBlur(caseData.netValueKey!, e.target.value)}
+                                                                className="border-gray-300 font-mono"
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
+                                            )}
 
                                             {/* Quick Notes */}
                                             <div className="space-y-2">

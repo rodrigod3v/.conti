@@ -1,17 +1,22 @@
 export const isDropdownColumn = (key: string): boolean => {
     const lower = key.toLowerCase();
+    
+    // Exclude numeric and currency fields from dropdowns
+    if (isNumericColumn(key) || isCurrencyColumn(key)) return false;
+    
     return (
         lower.includes("status") ||
         lower.includes("situação") ||
         lower.includes("nome") ||
         lower.includes("cliente") ||
         lower.includes("produto") ||
-        lower.includes("unidade") ||
         lower.includes("fornecedor") ||
         lower.includes("empresa") ||
         lower.includes("responsável") ||
         lower.includes("usuario") ||
         lower.includes("usuário") ||
+        lower === "unidade" || // Unit of measure (m², saco, kg, etc.)
+        lower.includes("unidade de medida") ||
         // Adding more common categorical fields
         lower.includes("categoria") ||
         lower.includes("departamento") ||
@@ -29,6 +34,21 @@ export const isCurrencyColumn = (key: string): boolean => {
     return lower.includes("valor") || lower.includes("montante") || lower.includes("liquido") || lower.includes("líquido") || lower.includes("custo") || lower.includes("preço");
 };
 
+export const isNumericColumn = (key: string): boolean => {
+    const lower = key.toLowerCase();
+    return (
+        lower.includes("quantidade") ||
+        lower.includes("qtd") ||
+        lower.includes("qtde") ||
+        // Exclude standalone "unidade" (unit of measure), but catch "valor unitário"
+        (lower.includes("unitário") || lower.includes("unitario")) ||
+        lower.includes("numero") ||
+        lower.includes("número") ||
+        lower.includes("count") ||
+        lower.includes("total") && !lower.includes("valor") // "Total" but not "Valor Total"
+    );
+};
+
 export const isObservationColumn = (key: string): boolean => {
     const lower = key.toLowerCase();
     return lower.includes("observ") || lower.includes("descri") || lower.includes("texto") || lower.includes("nota") || lower.includes("comentario") || lower.includes("comentário") || lower.includes("inconsist");
@@ -38,3 +58,5 @@ export const isReadonlyColumn = (key: string): boolean => {
     const lower = key.toLowerCase();
     return lower === "chamado" || lower === "caso" || lower === "id";
 };
+
+
