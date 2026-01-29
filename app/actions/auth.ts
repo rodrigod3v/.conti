@@ -55,6 +55,7 @@ export async function login(prevState: any, formData: FormData) {
 
     } catch (e) {
         if ((e as Error).message.includes("NEXT_REDIRECT")) throw e;
+        console.error("Login Check Error:", e); // Log real error
         return { error: "Erro ao realizar login." };
     }
 
@@ -97,6 +98,7 @@ export async function register(prevState: any, formData: FormData) {
 
     } catch (e) {
         if ((e as Error).message.includes("NEXT_REDIRECT")) throw e;
+        console.error("Register Check Error:", e); // Log real error
         return { error: "Erro ao registrar usuário." };
     }
 

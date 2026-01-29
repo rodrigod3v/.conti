@@ -586,7 +586,7 @@ export function DataEditor() {
             const value = row[header];
             return (
                 <Link href={`/cases/${linkId}`} className="font-medium text-blue-600 hover:underline hover:text-blue-800 line-clamp-1 block px-2 min-w-[120px]" title={String(value)}>
-                    {value || "CS-Link"}
+                    {typeof value === 'object' ? JSON.stringify(value) : (value || "CS-Link")}
                 </Link>
             );
         }
@@ -596,7 +596,7 @@ export function DataEditor() {
             const value = row[header];
             return (
                 <Link href={`/cases/${row["Chamado"] || row["Caso"] || value}`} className="font-medium text-blue-600 hover:underline hover:text-blue-800 line-clamp-1 block px-2 min-w-[120px]" title={String(value)}>
-                    {value || "CS-Link"}
+                    {typeof value === 'object' ? JSON.stringify(value) : (value || "CS-Link")}
                 </Link>
             );
         }

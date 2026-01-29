@@ -196,10 +196,13 @@ export default function SettingsPage() {
                                                         <p className="text-sm text-[#8a7560]">{member.toLowerCase().replace(/\s/g, '.')}@conti.com</p>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <select className="text-xs font-semibold bg-[#f5f2f0] border-none rounded-md focus:ring-[#f38a20] py-1 px-2 pr-8 text-[#003366] outline-none cursor-pointer">
-                                                            <option>Administrador</option>
-                                                            <option>Contador</option>
-                                                            <option selected={idx % 2 !== 0}>Visualizador</option>
+                                                        <select
+                                                            defaultValue={idx % 2 !== 0 ? "Visualizador" : "Administrador"}
+                                                            className="text-xs font-semibold bg-[#f5f2f0] border-none rounded-md focus:ring-[#f38a20] py-1 px-2 pr-8 text-[#003366] outline-none cursor-pointer"
+                                                        >
+                                                            <option value="Administrador">Administrador</option>
+                                                            <option value="Contador">Contador</option>
+                                                            <option value="Visualizador">Visualizador</option>
                                                         </select>
                                                     </td>
                                                     <td className="px-6 py-4">
