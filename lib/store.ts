@@ -14,12 +14,32 @@ export interface Comment {
   isReply?: boolean;
 }
 
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'Administrador' | 'Contador' | 'Visualizador';
+  status: 'Ativo' | 'Inativo';
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  cnpj?: string;
+  status: 'Ativo' | 'Inativo';
+}
+
 interface AppState {
   fileData: DataRow[];
   headers: string[];
   fileName: string | null;
   fileId: string | null;
   comments: Record<string, Comment[]>;
+  config: {
+      team: TeamMember[];
+      statusColors: Record<string, string>;
+      companies: Company[];
+  };
   setFileData: (data: DataRow[], headers: string[], fileName: string, fileId?: string | null) => void;
   updateCell: (rowIndex: number, column: string, value: string | number) => void;
   addRow: (row: DataRow) => void;
@@ -28,6 +48,13 @@ interface AppState {
   clearData: () => void;
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
+  
+  // Config Actions
+  addTeamMember: (member: Omit<TeamMember, 'id'>) => void;
+  removeTeamMember: (id: string) => void;
+  updateStatusColor: (status: string, color: string) => void;
+  addCompany: (company: Omit<Company, 'id'>) => void;
+  removeCompany: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -38,6 +65,11 @@ export const useAppStore = create<AppState>()(
       fileName: null,
       fileId: null,
       comments: {},
+      config: {
+          team: [],
+          statusColors: {},
+          companies: []
+      },
       setFileData: (data, headers, fileName, fileId = null) => set({ fileData: data, headers, fileName, fileId }),
       updateCell: (rowIndex, column, value) =>
         set((state) => {
@@ -49,7 +81,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           fileData: [row, ...state.fileData], // Add to top
         })),
-    deleteRow: (rowIndex) =>
+      deleteRow: (rowIndex) =>
         set((state) => {
             const newData = [...state.fileData];
             newData.splice(rowIndex, 1);
@@ -76,9 +108,41 @@ export const useAppStore = create<AppState>()(
           
           return { comments: newComments };
         }),
-      clearData: () => set({ fileData: [], headers: [], fileName: null, fileId: null, comments: {} }),
+      clearData: () => set({ fileData: [], headers: [], fileName: null, fileId: null, comments: {}, config: { team: [], statusColors: {}, companies: [] } }),
       isSidebarOpen: true,
       toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+
+      // Config Actions Implementation
+      addTeamMember: (member) => set((state) => ({
+          config: {
+              ...state.config,
+              team: [...state.config.team, { ...member, id: Math.random().toString(36).substr(2, 9) }]
+          }
+      })),
+      removeTeamMember: (id) => set((state) => ({
+          config: {
+              ...state.config,
+              team: state.config.team.filter(m => m.id !== id)
+          }
+      })),
+      updateStatusColor: (status, color) => set((state) => ({
+          config: {
+              ...state.config,
+              statusColors: { ...state.config.statusColors, [status]: color }
+          }
+      })),
+      addCompany: (company) => set((state) => ({
+          config: {
+              ...state.config,
+              companies: [...state.config.companies, { ...company, id: Math.random().toString(36).substr(2, 9) }]
+          }
+      })),
+      removeCompany: (id) => set((state) => ({
+          config: {
+              ...state.config,
+              companies: state.config.companies.filter(c => c.id !== id)
+          }
+      })),
     }),
     {
       name: 'conti-storage', // unique name
