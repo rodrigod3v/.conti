@@ -297,7 +297,7 @@ const EditableCell = ({
 
 export function DataEditor() {
     // ... (DataEditor START) ...
-    const { fileData, headers, fileName, updateCell, setFileData, clearData, deleteRow } = useAppStore();
+    const { fileData, headers, fileName, updateCell, setFileData, clearData, deleteRow, config } = useAppStore();
     const [isSaving, setIsSaving] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [isMounted, setIsMounted] = useState(false);
@@ -393,10 +393,29 @@ export function DataEditor() {
                     values.add(String(val));
                 }
             });
+
+            // --- Inject Config Values ---
+            if (h === "Responsável" || h === "Responsavel") {
+                config.team.filter(m => m.status === 'Ativo').forEach(m => values.add(m.name));
+            }
+            if (h === "Status") {
+                Object.keys(config.statusColors).forEach(s => values.add(s));
+            }
+            if (h === "Empresa" || h === "Fornecedor") {
+                config.companies.filter(c => c.status === 'Ativo').forEach(c => values.add(c.name));
+            }
+
+            // Inject Custom Configured Options
+            const fieldConfig = getFieldConfig(h);
+            if (fieldConfig.type === 'dropdown' && fieldConfig.options) {
+                fieldConfig.options.forEach(opt => values.add(opt));
+            }
+            // ----------------------------
+
             map[h] = Array.from(values).sort();
         });
         return map;
-    }, [fileData, headers]);
+    }, [fileData, headers, config, configVersion]);
 
     const filteredData = useMemo(() => {
         let data = fileData;
