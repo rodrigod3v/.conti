@@ -584,9 +584,27 @@ export function DataEditor() {
             // Priority: Chamado key (hidden internal), Case key, then header value
             const linkId = row["Chamado"] || row["Caso"] || row[header];
             const value = row[header];
+
+            let displayValue: React.ReactNode = value || "CS-Link";
+
+            // Try to format if it looks like a date (Object or ISO String)
+            if (value instanceof Date) {
+                try {
+                    displayValue = format(value, "dd/MM/yyyy");
+                } catch (e) { }
+            } else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+                // Handle ISO strings like 2026-01-28T00...
+                const d = new Date(value);
+                if (!isNaN(d.getTime())) {
+                    displayValue = format(d, "dd/MM/yyyy");
+                }
+            } else if (typeof value === 'object' && value !== null) {
+                displayValue = JSON.stringify(value);
+            }
+
             return (
                 <Link href={`/cases/${linkId}`} className="font-medium text-blue-600 hover:underline hover:text-blue-800 line-clamp-1 block px-2 min-w-[120px]" title={String(value)}>
-                    {typeof value === 'object' ? JSON.stringify(value) : (value || "CS-Link")}
+                    {displayValue}
                 </Link>
             );
         }
@@ -594,9 +612,24 @@ export function DataEditor() {
         // Special READ-ONLY Columns (Legacy checks, keeping explicitly for safety)
         if (headerLower === "chamado" || headerLower === "caso") {
             const value = row[header];
+            let displayValue: React.ReactNode = value || "CS-Link";
+
+            if (value instanceof Date) {
+                try {
+                    displayValue = format(value, "dd/MM/yyyy");
+                } catch (e) { }
+            } else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+                const d = new Date(value);
+                if (!isNaN(d.getTime())) {
+                    displayValue = format(d, "dd/MM/yyyy");
+                }
+            } else if (typeof value === 'object' && value !== null) {
+                displayValue = JSON.stringify(value);
+            }
+
             return (
                 <Link href={`/cases/${row["Chamado"] || row["Caso"] || value}`} className="font-medium text-blue-600 hover:underline hover:text-blue-800 line-clamp-1 block px-2 min-w-[120px]" title={String(value)}>
-                    {typeof value === 'object' ? JSON.stringify(value) : (value || "CS-Link")}
+                    {displayValue}
                 </Link>
             );
         }
