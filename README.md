@@ -1,55 +1,92 @@
-# Sistema de Controle Contábil (Accounting Control System)
+# Sistema de Controle Contábil (Conti)
 
-Uma plataforma moderna para gestão, validação e análise de dados contábeis. Projetada para automatizar a importação de planilhas complexas, normalizar inconsistências e fornecer insights visuais imediatos.
+Uma plataforma moderna e inteligente para gestão, validação e análise de casos contábeis. O **Conti** foi projetado para eliminar o trabalho manual de planilhas, automatizando a ingestão de dados, normalizando inconsistências e oferecendo uma interface focada na resolução de casos.
 
-## 🚀 Novidades da Versão Atual
-
-### 1. Ingestão Dinâmica & Inteligente
-- **Schema Flexível**: O sistema agora se adapta automaticamente às colunas da sua planilha. Não exige mais templates rígidos.
-- **Detecção Inteligente**:
-  - **Categorias**: Colunas como "Status", "Cliente", "Fornecedor" viram Dropdowns automaticamente.
-  - **Datas**: Converte formatações diversas (Excel Serial, Strings) para `dd/mm/yyyy`.
-  - **Moedas**: Identifica colunas financeiras ("Valor", "Líquido") e formata como BRL.
-- **Normalização**: Remove espaços extras e corrige variações de maiúsculas/minúsculas.
-
-### 2. Editor de Dados (Data Grid)
-- **Compacto & Responsivo**: A tabela se ajusta à altura da tela, evitando barra de rolagem na página inteira.
-- **Edição Avançada**:
-  - **Observações**: Campos de texto longo abrem em painéis confortáveis para leitura e edição.
-  - **Dropdowns Dinâmicos**: As opções são geradas baseadas nos valores únicos encontrados na coluna.
-- **Links Automáticos**: IDs detectados viram links diretos para a página de detalhes.
-
-### 3. Página de Detalhes do Caso
-- **Visual Limpo**: Exibe apenas os campos que possuem valor, removendo nulos ou vazios.
-- **Organização**: Cards retráteis para "Financeiro", "Informações Gerais" e "Outros Detalhes".
-- **Foco no Conteúdo**: Título simplificado mostrando apenas o ID e Nome relevante do item.
+## 🎯 Propósito do App
+Transformar planilhas estáticas e desorganizadas em **Casos Gerenciáveis**. O sistema serve como um "Hub Central" onde analistas podem importar dados brutos, visualizar detalhes ricos, editar informações com segurança e acompanhar o status de cada item até sua resolução.
 
 ---
 
-## 🛠️ Tech Stack
+## 🚀 Funcionalidades Principais
 
-- **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
-- **Linguagem**: TypeScript
-- **Estilização**: Tailwind CSS v4 & Shadcn/UI
-- **Estado**: Zustand (Store Global)
-- **Processamento**: SheetJS (Excel Parsing)
+### 1. Ingestão Dinâmica & Inteligente
+*   **Zero Configuração**: Basta arrastar sua planilha (Excel/CSV). O sistema mapeia automaticamente as colunas.
+*   **Detecção de Tipos**:
+    *   **Datas**: Reconhece formatos complexos (ex: "Tue Jan 27...") e converte para `DD/MM/AAAA`.
+    *   **Financeiro**: Formata colunas de valores como moeda BRL automaticamente.
+    *   **Categorias**: Transforma textos repetitivos em Dropdowns para filtragem fácil.
+
+### 2. Modal de Edição Adaptativo (novo)
+O coração da manipulação de dados. Ao editar um caso, a interface se molda ao conteúdo:
+*   **HUD Inteligente**: O layout se reorganiza automaticamente entre **1, 2 ou 3 colunas** para aproveitar o espaço da tela.
+*   **Seções Condicionais**:
+    *   *Contexto e Prazos*: Só aparece se houver dados de Cliente, Responsável ou Datas.
+    *   *Detalhes do Lançamento*: Oculta-se automaticamente se não houver campos numéricos/extras.
+    *   *Ação e Financeiro*: Painel fixo para decisão e status.
+*   **Formatação Visual**:
+    *   Datas em títulos e listas são renderizadas de forma legível.
+    *   Inputs financeiros vêm alinhados e formatados.
+
+### 3. Visualização de Arquivos (Preview)
+*   **Excel no Navegador**: Visualize o conteúdo de arquivos anexados sem precisar baixá-los.
+*   **Fallback Robusto**: Se o arquivo não puder ser exibido, o download é oferecido automaticamente.
+
+### 4. Página de Detalhes & Timeline
+*   **Histórico Completo**: Acompanhe a evolução do caso com comentários e logs de alteração.
+*   **Organização Visual**: Badges de status coloridos e agrupamento lógico de informações.
+
+---
+
+## 🛠️ Tech Stack & Infraestrutura
+
+### Stack de Desenvolvimento
+*   **Frontend**: [Next.js 15+](https://nextjs.org/) (App Router)
+*   **Linguagem**: TypeScript
+*   **UI/UX**: Tailwind CSS v4 + Shadcn/UI
+*   **Gerenciamento de Estado**: Zustand
+
+### Banco de Dados
+*   **ORM**: Prisma
+*   **Engine**: SQLite (Configurado para produção em arquivo persistente)
+*   **Estrutura**: `prisma/schema.prisma` define os modelos de `File`, `Row` (Dados Dinâmicos em JSON), `Setting` e `User`.
+
+### Versionamento
+O projeto utiliza **Git** com a seguinte estratégia de branches:
+*   `main`: Versão estável em produção.
+*   `feature/*`: Branches para novas funcionalidades (ex: `feature/dashboard`).
+
+---
+
+## ☁️ Deploy & VM Configuration
+
+O projeto está configurado para deploy em máquinas virtuais Linux (ex: Ubuntu na Oracle Cloud/AWS/Azure).
+
+### Arquitetura de Produção
+*   **Runtime**: Node.js gerenciado pelo **PM2** (Process Manager).
+*   **Automação**: Scripts PowerShell (`scripts/package_deploy.ps1`) empacotam a aplicação automaticamente.
+*   **Banco de Dados**: O arquivo `.db` reside fora da pasta da build (`~/app_data/`) para garantir persistência entre deploys.
+
+> 📄 **Guia Completo**: Para instruções passo-a-passo sobre chaves SSH, scripts de upload e comandos do servidor, consulte o arquivo [`DEPLOY.md`](./DEPLOY.md).
+
+---
 
 ## 📂 Estrutura do Projeto
 
 ```bash
 .
 ├── app/
-│   ├── (auth)/         # Login e Autenticação
-│   ├── (setup)/        # Fluxo de Primeiro Acesso (Perfil)
-│   ├── (main)/         # Dashboard, Editor, Detalhes
-│   └── layout.tsx      # Root Layout
+│   ├── (main)/         # Área logada (Dashboard, Casos)
+│   │   ├── cases/[id]/ # Página de Detalhes e Modal de Edição
+│   │   └── editor/     # Grid de Dados e Importação
+│   └── layout.tsx      # Configurações Globais
 ├── components/
-│   ├── features/       # DataEditor, Cards, UploadZone
-│   └── ui/             # Componentes Shadcn (Button, Card, Input...)
+│   ├── features/       # Componentes de Negócio (EditModal, CaseTimeline...)
+│   └── ui/             # Biblioteca de Design (Botões, Inputs...)
 ├── lib/
-│   ├── column-utils.ts # Lógica centralizada de tipos de coluna
-│   └── store.ts        # Gerenciamento de estado (Zustand)
-└── public/             # Assets estáticos
+│   ├── column-utils.ts # Inteligência de detecção de colunas
+│   └── field-config.ts # Configurações de campos dinâmicos
+├── prisma/             # Schema do Banco de Dados e Migrations
+└── scripts/            # Scripts de automação de build e deploy
 ```
 
 ## 🔧 Como Rodar Localmente
@@ -59,14 +96,15 @@ Uma plataforma moderna para gestão, validação e análise de dados contábeis.
     npm install
     ```
 
-2.  **Inicie o servidor**:
+2.  **Configure o Banco de Dados**:
+    ```bash
+    npx prisma generate
+    npx prisma push --accept-data-loss
+    ```
+
+3.  **Inicie o servidor de desenvolvimento**:
     ```bash
     npm run dev
     ```
 
-3.  **Acesse**: `http://localhost:3000`
-
-## 🤝 Desenvolvimento
-
-- **Padronização**: Toda a lógica de detecção de colunas reside em `lib/column-utils.ts`.
-- **Layouts**: Utilizamos `h-screen` e `flex` para garantir que a aplicação se comporte como um software desktop.
+4.  **Acesse**: `http://localhost:3000`
