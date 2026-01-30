@@ -48,15 +48,17 @@ import {
     PlusCircle,
     ChevronDown,
     ChevronUp,
-    ListFilter
+    ListFilter,
+    Loader2
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ExcelJS from "exceljs";
 import { NewCaseWizard } from "@/components/features/new-case-wizard";
 import { useToast } from "@/components/ui/simple-toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ImportButton } from "@/components/features/import-button";
 
 // --- Helper Components ---
 
@@ -335,6 +337,7 @@ export function DataEditor() {
 
     // Redirect to Home if no file data (after hydration)
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     useEffect(() => {
         if (isMounted && (!fileData || fileData.length === 0)) {
@@ -358,6 +361,21 @@ export function DataEditor() {
     const [searchTerm, setSearchTerm] = useState("");
     const [filterColumn, setFilterColumn] = useState<string>("all");
     const [filterValue, setFilterValue] = useState<string>("all");
+
+    // Initialize from URL params
+    useEffect(() => {
+        if (isMounted) {
+            const col = searchParams.get("column");
+            const val = searchParams.get("value");
+            if (col && val) {
+                setFilterColumn(col);
+                setFilterValue(val);
+
+                // Optional: Clear URL after applying to keep it clean, or keep it for deep linking.
+                // Keeping it is better for refresh persistence, but might want to update it if user changes filter manually.
+            }
+        }
+    }, [isMounted, searchParams]);
     const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
     const [visibleCount, setVisibleCount] = useState(10);
@@ -451,7 +469,14 @@ export function DataEditor() {
         }
         // Column Filter
         if (filterColumn !== "all" && filterValue !== "all") {
-            data = data.filter(row => String(row[filterColumn]) === filterValue);
+            data = data.filter(row => {
+                const cellValue = String(row[filterColumn]);
+                // Allow partial match for dates (e.g. "/01/" for Jan) passed from Dashboard
+                if (filterValue.includes("/")) {
+                    return cellValue.includes(filterValue);
+                }
+                return cellValue === filterValue;
+            });
         }
         // Date Filter
         if (dateFilter) {
@@ -697,85 +722,71 @@ export function DataEditor() {
     return (
         <div className="flex flex-col gap-4 max-h-[calc(100vh-6rem)] h-full">
             {/* Header Section */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
-                <div className="space-y-1">
+            <header className="h-16 bg-white dark:bg-[#1a242f] border-b border-border/40 flex items-center justify-between px-6 shrink-0 shadow-sm z-10 -m-6 mb-4">
+                <div className="flex flex-col justify-center">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-xl font-bold tracking-tight">Editor de Dados</h1>
+                        <h1 className="text-xl font-bold text-[#111418] dark:text-white tracking-tight">Gestão de Lançamentos</h1>
                         {fileName && (
-                            <div className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase text-amber-700 shrink-0">
+                            <span className="text-xs font-bold uppercase tracking-wide text-foreground/80 bg-neutral-200/60 dark:bg-neutral-800/60 px-2.5 py-1 rounded-md border border-black/5 dark:border-white/10 shadow-sm">
                                 {fileName.replace("lançamentos contábeis de ", "").replace(".xlsx", "").replace(".csv", "")}
-                            </div>
+                            </span>
                         )}
                         {errorCount > 0 && (
-                            <div className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 ring-1 ring-inset ring-red-600/10">
+                            <span className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-600 ring-1 ring-inset ring-red-600/10">
                                 <AlertCircle className="h-3 w-3" />
-                                {errorCount}
-                            </div>
+                                {errorCount} Erros
+                            </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-2 pt-1">
-                        <Button
-                            variant="default"
-                            className="h-8 gap-2 shadow-xs transition-all text-xs font-medium bg-[#FF8C00] hover:bg-[#FF8C00]/90 text-white border-transparent"
-                            onClick={() => setIsWizardOpen(true)}
-                        >
-                            <PlusCircle className="h-3.5 w-3.5" />
-                            Novo Item
-                        </Button>
-                    </div>
-
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                        Visualização e Edição <span className="text-muted-foreground/40">•</span> {fileData.length} Registros
+                    </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" className="h-9 gap-2 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={handleExit}>
-                        <X className="h-4 w-4" />
-                        Encerrar Edição
-                    </Button>
-                    <div className="w-[1px] h-6 bg-border mx-1 hidden md:block" />
 
-                    <Button variant="outline" className="h-9 gap-2 hidden md:flex" onClick={handleExport}>
+                <div className="flex items-center gap-2 h-full">
+                    {/* Header Actions: Import, Export, Exit */}
+                    <ImportButton variant="ghost" className="h-8 rounded-full px-3 text-muted-foreground hover:text-foreground border border-transparent hover:border-border/50" />
+
+                    <Button variant="ghost" size="sm" className="h-8 gap-2 rounded-full text-muted-foreground hover:text-foreground" onClick={handleExport}>
                         <Download className="h-4 w-4" />
-                        Exportar Sheets
+                        <span className="hidden sm:inline text-xs">Exportar</span>
                     </Button>
-                    <Button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="h-9 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                    >
-                        {isSaving ? (
-                            "Salvando..."
-                        ) : (
-                            <>
-                                <Save className="h-4 w-4" />
-                                Salvar Alterações
-                            </>
-                        )}
+
+                    <div className="w-[1px] h-6 bg-border/60 mx-1" />
+
+                    <Button variant="ghost" size="sm" className="h-8 gap-2 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={handleExit}>
+                        <X className="h-4 w-4" />
+                        <span className="hidden sm:inline text-xs">Encerrar</span>
                     </Button>
                 </div>
-            </div>
+            </header>
+
+
 
             <NewCaseWizard open={isWizardOpen} onOpenChange={setIsWizardOpen} />
 
 
 
             {/* Filters Section */}
-            <div className="flex flex-col gap-3 rounded-lg border bg-card p-2 md:flex-row md:items-center bg-white shrink-0">
-                <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Buscar por caso, responsável ou valor..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 h-9 border-muted-foreground/20"
-                    />
-                </div>
-                <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-3 rounded-lg border bg-card p-2 md:flex-row md:items-center bg-white shrink-0 justify-between">
+                <div className="flex items-center gap-4 overflow-x-auto pb-1 no-scrollbar flex-1">
+                    <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Buscar..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-8 h-9 w-[200px] lg:w-[280px] bg-muted/30 border-muted-foreground/20"
+                        />
+                    </div>
+
                     <div className="h-8 w-[1px] bg-border mx-2 hidden md:block" />
 
                     <Select value={filterColumn} onValueChange={(val) => { setFilterColumn(val); setFilterValue("all"); }}>
-                        <SelectTrigger className="w-[180px] border-muted-foreground/20 h-9">
-                            <div className="flex items-center gap-2">
-                                <Filter className="h-4 w-4 text-muted-foreground" />
-                                <SelectValue placeholder="Filtrar por..." />
+                        <SelectTrigger className="w-auto min-w-[150px] max-w-[300px] border-muted-foreground/20 h-9 px-3">
+                            <div className="flex items-center gap-2 truncate">
+                                <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <SelectValue placeholder="Filtrar..." className="truncate" />
                             </div>
                         </SelectTrigger>
                         <SelectContent>
@@ -788,10 +799,10 @@ export function DataEditor() {
 
                     {filterColumn !== "all" && (
                         <Select value={filterValue} onValueChange={setFilterValue}>
-                            <SelectTrigger className="w-[180px] border-muted-foreground/20 h-9">
-                                <div className="flex items-center gap-2">
-                                    <ListFilter className="h-4 w-4 text-muted-foreground" />
-                                    <SelectValue placeholder="Selecione valor..." />
+                            <SelectTrigger className="w-auto min-w-[150px] max-w-[260px] border-muted-foreground/20 h-9 px-3">
+                                <div className="flex items-center gap-2 truncate">
+                                    <ListFilter className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <SelectValue placeholder="Valor..." className="truncate" />
                                 </div>
                             </SelectTrigger>
                             <SelectContent>
@@ -806,11 +817,13 @@ export function DataEditor() {
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" className={cn(
-                                "h-9 border-muted-foreground/20 gap-2 font-normal text-muted-foreground",
+                                "h-9 border-muted-foreground/20 gap-2 font-normal text-muted-foreground w-[130px] justify-start ml-2",
                                 dateFilter && "text-accent-foreground border-accent-foreground/30 bg-accent"
                             )}>
                                 <CalendarIcon className="h-4 w-4" />
-                                {dateFilter ? format(dateFilter, "dd/MM/yyyy", { locale: ptBR }) : format(new Date(), "dd/MM/yyyy", { locale: ptBR })}
+                                <span className="truncate">
+                                    {dateFilter ? format(dateFilter, "dd/MM/yyyy", { locale: ptBR }) : "Data"}
+                                </span>
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="end">
@@ -833,44 +846,66 @@ export function DataEditor() {
                                 </div>
                             )}
                         </PopoverContent>
-                    </Popover>
-
-                    {errorCount > 0 && (
-                        <Button variant="outline" className="h-9 border-red-200 bg-red-50 text-red-600 hover:bg-red-100 gap-2">
-                            <AlertCircle className="h-4 w-4" />
-                            Erros ({errorCount})
-                        </Button>
-                    )}
+                    </Popover >
                 </div>
-            </div>
+
+                {/* Right Side: Actions */}
+                <div className="flex items-center gap-2 pl-2 border-l border-border/50">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 gap-2 transition-all text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg px-3"
+                        onClick={() => setIsWizardOpen(true)}
+                    >
+                        <PlusCircle className="h-4 w-4" />
+                        Novo
+                    </Button>
+                    <Button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        size="sm"
+                        variant="ghost"
+                        className="h-9 gap-2 transition-all text-xs font-bold text-muted-foreground hover:text-foreground border border-transparent hover:border-border rounded-full px-4 hover:bg-muted/50"
+                    >
+                        {isSaving ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <Save className="h-3.5 w-3.5" />
+                        )}
+                        Salvar
+                    </Button>
+                </div>
+            </div >
 
             {/* Sheets Tabs - Moved and Styled */}
-            {sheets && Object.keys(sheets).length > 1 && (
-                <div className="shrink-0 mt-2 mb-4 px-1">
-                    <Tabs
-                        value={activeSheet || Object.keys(sheets)[0]}
-                        onValueChange={(val) => changeSheet(val)}
-                        className="w-full"
-                    >
-                        <TabsList className="w-full justify-start h-auto bg-transparent p-0 gap-2 overflow-x-auto border-b border-transparent">
-                            {Object.keys(sheets).map((sheetName) => (
-                                <TabsTrigger
-                                    key={sheetName}
-                                    value={sheetName}
-                                    className="
-                                        data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-black/5
-                                        text-muted-foreground hover:text-foreground hover:bg-muted/50
-                                        rounded-md px-4 py-2 h-9 transition-all font-medium text-sm
-                                        flex items-center gap-2 border border-transparent
-                                    "
-                                >
-                                    {sheetName}
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
-                    </Tabs>
-                </div>
-            )}
+            {
+                sheets && Object.keys(sheets).length > 1 && (
+                    <div className="shrink-0 mt-2 mb-4 px-1">
+                        <Tabs
+                            value={activeSheet || Object.keys(sheets)[0]}
+                            onValueChange={(val) => changeSheet(val)}
+                            className="w-full"
+                        >
+                            <TabsList className="w-full justify-start h-auto bg-transparent p-0 gap-2 overflow-x-auto border-b border-transparent">
+                                {Object.keys(sheets).map((sheetName) => (
+                                    <TabsTrigger
+                                        key={sheetName}
+                                        value={sheetName}
+                                        className="
+                        data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-black/5
+                        text-muted-foreground hover:text-foreground hover:bg-muted/50
+                        rounded-md px-4 py-2 h-9 transition-all font-medium text-sm
+                        flex items-center gap-2 border border-transparent
+                        "
+                                    >
+                                        {sheetName}
+                                    </TabsTrigger>
+                                ))}
+                            </TabsList>
+                        </Tabs>
+                    </div>
+                )
+            }
 
 
             {/* Table Section */}
