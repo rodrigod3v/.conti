@@ -51,6 +51,16 @@ import {
     DialogTrigger,
     DialogFooter,
 } from "@/components/ui/dialog";
+
+import ExcelJS from 'exceljs';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getFieldConfig, shouldFormatCurrency, isDropdownField, isDateField, isTextareaField } from "@/lib/field-config";
@@ -75,6 +85,11 @@ export default function CaseDetailsPage() {
 
     // Document State
     const [documents, setDocuments] = useState<any[]>([]);
+
+    // Preview States
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewData, setPreviewData] = useState<{ name: string; rows: any[][] } | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
     // Edit State - Dynamic form for all fields
     const [editForm, setEditForm] = useState<Record<string, string>>({});
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -425,6 +440,41 @@ export default function CaseDetailsPage() {
         );
     }
 
+    // Calculate dynamic fields for Edit Modal visibility
+    const dynamicFields = Object.keys(editForm).filter(key => {
+        const trackedKeys = [
+            caseData.clientKey,
+            caseData.responsibleKey,
+            caseData.openedAtKey,
+            caseData.dueDateKey,
+            caseData.statusKey,
+            caseData.valueKey,
+            caseData.netValueKey,
+            caseData.paymentMethodKey,
+            caseData.pccKey,
+            caseData.irKey,
+            caseData.issBaseKey,
+            caseData.periodKey,
+            caseData.descriptionField,
+        ].filter(Boolean); // Remove nulls
+
+        // Exclude tracked keys
+        if (trackedKeys.includes(key)) return false;
+
+        // Exclude ID fields
+        const lower = key.toLowerCase();
+        if (lower === "id" || lower === "chamado" || lower === "caso") return false;
+        if (lower.includes(" id ") || lower.startsWith("id ") || lower.endsWith(" id")) return false;
+
+        // Exclude observation/notes fields (shown in Quick Notes)
+        if (lower.includes("observ") || lower.includes("nota")) return false;
+
+        return true;
+    }).sort();
+
+    const hasContextFields = !!(caseData.clientKey || caseData.responsibleKey || caseData.openedAtKey || caseData.dueDateKey);
+    const hasDetailFields = dynamicFields.length > 0;
+
     return (
         <div className="min-h-screen bg-background pb-20">
             {/* Breadcrumbs */}
@@ -470,7 +520,16 @@ export default function CaseDetailsPage() {
                                             <Edit className="h-4 w-4 text-accent-foreground" />
                                         </div>
                                         <div>
-                                            <DialogTitle className="text-lg font-bold">Editar Caso #{caseData.id}</DialogTitle>
+                                            <DialogTitle className="text-lg font-bold">
+                                                Editar Caso #{(() => {
+                                                    const idStr = String(caseData.id);
+                                                    if (idStr.length > 10 && (idStr.includes("GMT") || idStr.includes("T"))) {
+                                                        const date = new Date(idStr);
+                                                        if (!isNaN(date.getTime())) return date.toLocaleDateString("pt-BR");
+                                                    }
+                                                    return idStr;
+                                                })()}
+                                            </DialogTitle>
                                             <DialogDescription className="text-xs text-muted-foreground">
                                                 Atualize as informações do caso abaixo.
                                             </DialogDescription>
@@ -478,128 +537,98 @@ export default function CaseDetailsPage() {
                                     </div>
                                 </DialogHeader>
                                 <div className="flex-1 overflow-y-auto px-6 py-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${[hasContextFields, hasDetailFields, true].filter(Boolean).length} gap-6`}>
                                         {/* Column 1: Contexto e Prazos (Who & When) */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                                                <Briefcase className="h-4 w-4 text-accent-foreground" />
-                                                <h3 className="font-bold text-sm text-foreground">Contexto e Prazos</h3>
-                                            </div>
-
-                                            {/* Client - Only if clientKey exists */}
-                                            {caseData.clientKey && (
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">
-                                                        {caseData.clientKey}
-                                                    </Label>
-                                                    <Input
-                                                        value={editForm[caseData.clientKey] || ""}
-                                                        onChange={(e) => setEditForm({ ...editForm, [caseData.clientKey!]: e.target.value })}
-                                                        className="border-gray-300"
-                                                    />
+                                        {hasContextFields && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                                                    <Briefcase className="h-4 w-4 text-accent-foreground" />
+                                                    <h3 className="font-bold text-sm text-foreground">Contexto e Prazos</h3>
                                                 </div>
-                                            )}
 
-                                            {/* Responsible - Only if responsibleKey exists */}
-                                            {caseData.responsibleKey && (
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-gray-600 uppercase">Responsável</Label>
-                                                    <Select
-                                                        value={editForm[caseData.responsibleKey] || ""}
-                                                        onValueChange={(val) => setEditForm({ ...editForm, [caseData.responsibleKey!]: val })}
-                                                    >
-                                                        <SelectTrigger className="border-gray-300">
-                                                            <SelectValue placeholder="Selecione o responsável" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {(uniqueOptions[caseData.responsibleKey] || []).map((opt) => (
-                                                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            )}
-
-                                            {(caseData.openedAtKey || caseData.dueDateKey) && <Separator />}
-
-                                            {/* Dates (Moved from old Col 2) */}
-                                            <div className="grid grid-cols-1 gap-4">
-                                                {/* Data Abertura - Only if openedAtKey exists */}
-                                                {caseData.openedAtKey && (
+                                                {/* Client - Only if clientKey exists */}
+                                                {caseData.clientKey && (
                                                     <div className="space-y-2">
-                                                        <Label className="text-xs font-semibold text-gray-600 uppercase">Data Abertura</Label>
+                                                        <Label className="text-xs font-semibold text-gray-600 uppercase">
+                                                            {caseData.clientKey}
+                                                        </Label>
                                                         <Input
-                                                            value={editForm[caseData.openedAtKey] || ""}
-                                                            onChange={(e) => setEditForm({ ...editForm, [caseData.openedAtKey!]: e.target.value })}
+                                                            value={editForm[caseData.clientKey] || ""}
+                                                            onChange={(e) => setEditForm({ ...editForm, [caseData.clientKey!]: e.target.value })}
                                                             className="border-gray-300"
-                                                            placeholder="DD/MM/AAAA"
                                                         />
                                                     </div>
                                                 )}
 
-                                                {/* Vencimento - Only if dueDateKey exists */}
-                                                {caseData.dueDateKey && (
+                                                {/* Responsible - Only if responsibleKey exists */}
+                                                {caseData.responsibleKey && (
                                                     <div className="space-y-2">
-                                                        <Label className="text-xs font-semibold text-gray-600 uppercase">Vencimento</Label>
-                                                        <Input
-                                                            value={editForm[caseData.dueDateKey] || ""}
-                                                            onChange={(e) => setEditForm({ ...editForm, [caseData.dueDateKey!]: e.target.value })}
-                                                            className="border-gray-300"
-                                                            placeholder="DD/MM/AAAA"
-                                                        />
+                                                        <Label className="text-xs font-semibold text-gray-600 uppercase">Responsável</Label>
+                                                        <Select
+                                                            value={editForm[caseData.responsibleKey] || ""}
+                                                            onValueChange={(val) => setEditForm({ ...editForm, [caseData.responsibleKey!]: val })}
+                                                        >
+                                                            <SelectTrigger className="border-gray-300">
+                                                                <SelectValue placeholder="Selecione o responsável" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {(uniqueOptions[caseData.responsibleKey] || []).map((opt) => (
+                                                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
                                                     </div>
                                                 )}
+
+                                                {(caseData.openedAtKey || caseData.dueDateKey) && <Separator />}
+
+                                                {/* Dates (Moved from old Col 2) */}
+                                                <div className="grid grid-cols-1 gap-4">
+                                                    {/* Data Abertura - Only if openedAtKey exists */}
+                                                    {caseData.openedAtKey && (
+                                                        <div className="space-y-2">
+                                                            <Label className="text-xs font-semibold text-gray-600 uppercase">Data Abertura</Label>
+                                                            <Input
+                                                                value={editForm[caseData.openedAtKey] || ""}
+                                                                onChange={(e) => setEditForm({ ...editForm, [caseData.openedAtKey!]: e.target.value })}
+                                                                className="border-gray-300"
+                                                                placeholder="DD/MM/AAAA"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Vencimento - Only if dueDateKey exists */}
+                                                    {caseData.dueDateKey && (
+                                                        <div className="space-y-2">
+                                                            <Label className="text-xs font-semibold text-gray-600 uppercase">Vencimento</Label>
+                                                            <Input
+                                                                value={editForm[caseData.dueDateKey] || ""}
+                                                                onChange={(e) => setEditForm({ ...editForm, [caseData.dueDateKey!]: e.target.value })}
+                                                                className="border-gray-300"
+                                                                placeholder="DD/MM/AAAA"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         {/* Column 2: Detalhes do Lançamento (What) */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                                                <AlignLeft className="h-4 w-4 text-accent-foreground" />
-                                                <h3 className="font-bold text-sm text-foreground">Detalhes do Lançamento</h3>
-                                            </div>
+                                        {hasDetailFields && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                                                    <AlignLeft className="h-4 w-4 text-accent-foreground" />
+                                                    <h3 className="font-bold text-sm text-foreground">Detalhes do Lançamento</h3>
+                                                </div>
 
-                                            {/* Dynamic Fields */}
-                                            <div className="pt-2">
-                                                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">
-                                                    Outros Campos
-                                                </Label>
+                                                {/* Dynamic Fields */}
+                                                <div className="pt-2">
+                                                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">
+                                                        Outros Campos
+                                                    </Label>
 
-                                                <div className="grid grid-cols-1 gap-4 pr-2 max-h-[300px] overflow-y-auto">
-                                                    {Object.keys(editForm)
-                                                        .filter(key => {
-                                                            // Build list of tracked keys to exclude
-                                                            const trackedKeys = [
-                                                                caseData.clientKey,
-                                                                caseData.responsibleKey,
-                                                                caseData.openedAtKey,
-                                                                caseData.dueDateKey,
-                                                                caseData.statusKey,
-                                                                caseData.valueKey,
-                                                                caseData.netValueKey,
-                                                                caseData.paymentMethodKey,
-                                                                caseData.pccKey,
-                                                                caseData.irKey,
-                                                                caseData.issBaseKey,
-                                                                caseData.periodKey,
-                                                                caseData.descriptionField,
-                                                            ].filter(Boolean); // Remove nulls
-
-                                                            // Exclude tracked keys
-                                                            if (trackedKeys.includes(key)) return false;
-
-                                                            // Exclude ID fields
-                                                            const lower = key.toLowerCase();
-                                                            if (lower === "id" || lower === "chamado" || lower === "caso") return false;
-                                                            if (lower.includes(" id ") || lower.startsWith("id ") || lower.endsWith(" id")) return false;
-
-                                                            // Exclude observation/notes fields (shown in Quick Notes)
-                                                            if (lower.includes("observ") || lower.includes("nota")) return false;
-
-                                                            return true;
-                                                        })
-                                                        .sort()
-                                                        .map((key) => {
+                                                    <div className="grid grid-cols-1 gap-4 pr-2 max-h-[300px] overflow-y-auto">
+                                                        {dynamicFields.map((key) => {
                                                             const options = uniqueOptions[key] || [];
                                                             const fieldConfig = getFieldConfig(key);
                                                             const currentValue = editForm[key] || "";
@@ -626,9 +655,19 @@ export default function CaseDetailsPage() {
                                                                                 <SelectValue placeholder={`Selecione ${key}`} />
                                                                             </SelectTrigger>
                                                                             <SelectContent>
-                                                                                {options.map((opt) => (
-                                                                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                                                                ))}
+                                                                                {options.map((opt) => {
+                                                                                    // Format date if key suggests it is a date
+                                                                                    let displayLabel = opt;
+                                                                                    const lowerKey = key.toLowerCase();
+                                                                                    if (lowerKey.includes("data") || lowerKey.includes("date") || lowerKey.includes("vencimento") || lowerKey.includes("criado")) {
+                                                                                        const date = new Date(opt);
+                                                                                        if (!isNaN(date.getTime()) && opt.length > 10) {
+                                                                                            displayLabel = date.toLocaleDateString("pt-BR");
+                                                                                        }
+                                                                                    }
+
+                                                                                    return <SelectItem key={opt} value={opt}>{displayLabel}</SelectItem>;
+                                                                                })}
                                                                             </SelectContent>
                                                                         </Select>
                                                                     ) : isTextarea ? (
@@ -649,45 +688,20 @@ export default function CaseDetailsPage() {
                                                                             }}
                                                                             className={cn(
                                                                                 "border-gray-300",
-                                                                                isCurrency && "font-mono text-right"
+                                                                                isCurrency && "font-mono"
                                                                             )}
                                                                         />
                                                                     )}
                                                                 </div>
                                                             );
                                                         })}
-                                                    {/* Empty state if no extra fields */}
-                                                    {Object.keys(editForm).filter(key => {
-                                                        const trackedKeys = [
-                                                            caseData.clientKey,
-                                                            caseData.responsibleKey,
-                                                            caseData.openedAtKey,
-                                                            caseData.dueDateKey,
-                                                            caseData.statusKey,
-                                                            caseData.valueKey,
-                                                            caseData.netValueKey,
-                                                            caseData.paymentMethodKey,
-                                                            caseData.pccKey,
-                                                            caseData.irKey,
-                                                            caseData.issBaseKey,
-                                                            caseData.periodKey,
-                                                            caseData.descriptionField,
-                                                        ].filter(Boolean);
-
-                                                        if (trackedKeys.includes(key)) return false;
-
-                                                        const lower = key.toLowerCase();
-                                                        if (lower === "id" || lower === "chamado" || lower === "caso") return false;
-                                                        if (lower.includes(" id ") || lower.startsWith("id ") || lower.endsWith(" id")) return false;
-                                                        if (lower.includes("observ") || lower.includes("nota")) return false;
-
-                                                        return true;
-                                                    }).length === 0 && (
-                                                            <div className="text-sm text-gray-500 italic py-4">Nenhum campo adicional disponível.</div>
-                                                        )}
+                                                        {/* Empty state if no extra fields */}
+                                                        {/* No longer needed as we hide the section */}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}                                                    {/* Empty state if no extra fields */}
+
 
                                         {/* Column 3: Ação e Financeiro (Impact & Resolution) */}
                                         <div className="space-y-4">
@@ -799,8 +813,8 @@ export default function CaseDetailsPage() {
                             <CheckCircle className="h-4 w-4" />
                             Finalizar Caso
                         </Button>
-                    </div>
-                </div>
+                    </div >
+                </div >
 
                 <div className="flex flex-col lg:flex-row gap-6 mt-6">
                     {/* Main Content */}
@@ -915,10 +929,81 @@ export default function CaseDetailsPage() {
                                             }
                                             name={doc.name}
                                             meta={`${doc.type} • ${doc.size} • Por ${doc.user}`}
-                                            onView={() => {
+                                            onView={async () => {
                                                 if (doc.fileObj) {
-                                                    const url = URL.createObjectURL(doc.fileObj);
-                                                    window.open(url, '_blank');
+                                                    // Smart View Logic
+                                                    const viewableTypes = ['PDF', 'PNG', 'JPG', 'JPEG', 'GIF', 'TXT'];
+                                                    const isSpreadsheet = ['XLSX', 'XLS', 'CSV'].includes(doc.type);
+
+                                                    if (viewableTypes.includes(doc.type)) {
+                                                        const url = URL.createObjectURL(doc.fileObj);
+                                                        window.open(url, '_blank');
+                                                    } else if (isSpreadsheet) {
+                                                        // Excel Preview Logic
+                                                        console.log("Starting Excel Preview for:", doc.name);
+                                                        setPreviewLoading(true);
+                                                        toast.item("Carregando visualização...", "Aguarde enquanto processamos o arquivo.");
+
+                                                        try {
+                                                            if (!doc.fileObj || typeof doc.fileObj.arrayBuffer !== 'function') {
+                                                                throw new Error("Invalid file object");
+                                                            }
+
+                                                            console.log("Reading buffer...");
+                                                            const buffer = await doc.fileObj.arrayBuffer();
+                                                            console.log("Buffer read. Loading workbook...");
+
+                                                            const workbook = new ExcelJS.Workbook();
+                                                            await workbook.xlsx.load(buffer);
+                                                            console.log("Workbook loaded. Sheets:", workbook.worksheets.length);
+
+                                                            const worksheet = workbook.worksheets[0];
+                                                            const rows: any[][] = [];
+
+                                                            // Read first 50 rows for preview
+                                                            worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+                                                                if (rowNumber <= 50) {
+                                                                    // ExcelJS row.values is 1-indexed, so we slice(1) if it's an array
+                                                                    // Defensive check for values
+                                                                    if (row.values) {
+                                                                        const values = Array.isArray(row.values) ? row.values.slice(1) : Object.values(row.values);
+                                                                        rows.push(values);
+                                                                    }
+                                                                }
+                                                            });
+
+                                                            console.log("Rows extracted:", rows.length);
+                                                            setPreviewData({
+                                                                name: doc.name,
+                                                                rows: rows
+                                                            });
+                                                            setIsPreviewOpen(true);
+                                                        } catch (err) {
+                                                            console.error("Preview Error:", err);
+                                                            toast.error("Erro na visualização", "Não foi possível abrir o preview. Baixando arquivo...");
+
+                                                            // Fallback to download
+                                                            const url = URL.createObjectURL(doc.fileObj);
+                                                            const link = document.createElement('a');
+                                                            link.href = url;
+                                                            link.download = doc.name;
+                                                            document.body.appendChild(link);
+                                                            link.click();
+                                                            document.body.removeChild(link);
+                                                        } finally {
+                                                            setPreviewLoading(false);
+                                                        }
+                                                    } else {
+                                                        // Absolute fallback
+                                                        toast.item("Visualização não suportada", "Baixando arquivo...");
+                                                        const url = URL.createObjectURL(doc.fileObj);
+                                                        const link = document.createElement('a');
+                                                        link.href = url;
+                                                        link.download = doc.name;
+                                                        document.body.appendChild(link);
+                                                        link.click();
+                                                        document.body.removeChild(link);
+                                                    }
                                                 } else {
                                                     toast.error("Visualização Indisponível", "O arquivo original não está acessível.");
                                                 }
@@ -1013,8 +1098,70 @@ export default function CaseDetailsPage() {
 
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+
+            {/* Excel Preview Modal (Correctly Placed) */}
+            < Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen} >
+                <DialogContent className="max-w-[90vw] max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+                            Visualização: {previewData?.name}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Exibindo as primeiras 50 linhas para conferência rápida. Faça o download para ver o arquivo completo.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex-1 overflow-auto border rounded-md mt-4">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    {previewData?.rows[0]?.map((header: any, idx: number) => (
+                                        <TableHead key={idx} className="whitespace-nowrap bg-muted/50 font-bold text-foreground">
+                                            {String(header || "")}
+                                        </TableHead>
+                                    ))}
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {previewData?.rows.slice(1).map((row, rIdx) => (
+                                    <TableRow key={rIdx}>
+                                        {row.map((cell: any, cIdx: number) => (
+                                            <TableCell key={cIdx} className="whitespace-nowrap text-xs py-2">
+                                                {String(cell || "")}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button variant="secondary" onClick={() => setIsPreviewOpen(false)}>
+                            Fechar
+                        </Button>
+                        <Button onClick={() => {
+                            // Trigger download
+                            const doc = documents.find(d => d.name === previewData?.name);
+                            if (doc?.fileObj) {
+                                const url = URL.createObjectURL(doc.fileObj);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = doc.name;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                            }
+                        }}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Baixar Arquivo Completo
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog >
+        </div >
 
     );
 }
@@ -1128,7 +1275,9 @@ function Comment({ name, time, avatarSeed, text, isReply }: { name: string, time
                 )}>
                     {text}
                 </div>
-            </div>
-        </div>
+            </div >
+
+
+        </div >
     );
 }
