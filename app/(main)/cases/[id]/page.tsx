@@ -32,7 +32,9 @@ import {
     Briefcase,
     FileText as FileTextIcon,
     AlignLeft,
-
+    Upload,
+    File as FileIcon,
+    Trash2,
 } from "lucide-react";
 import { getStatusColor } from "@/lib/status-utils";
 import Link from "next/link";
@@ -71,6 +73,8 @@ export default function CaseDetailsPage() {
     // Comment State
     const [newComment, setNewComment] = useState("");
 
+    // Document State
+    const [documents, setDocuments] = useState<any[]>([]);
     // Edit State - Dynamic form for all fields
     const [editForm, setEditForm] = useState<Record<string, string>>({});
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -220,10 +224,16 @@ export default function CaseDetailsPage() {
         // Helper to format currency values inside useMemo
         const formatMoney = (val: any) => {
             if (val === undefined || val === null || String(val).trim() === "") return null;
+
+            // STRICT CHECK: If it contains letters (except R$), do not format
+            const strVal = String(val);
+            const hasLetters = /[a-zA-Z]/.test(strVal.replace(/R\$/gi, "").trim());
+            if (hasLetters) return strVal;
+
             try {
                 // Normalize, same logic as otherFields
-                const clean = String(val).replace(/[^\d,\.-]/g, "");
-                if (!clean) return String(val);
+                const clean = strVal.replace(/[^\d,\.-]/g, "");
+                if (!clean) return strVal;
 
                 let floatVal = parseFloat(clean);
                 // If it had a comma and no dot, assume comma is decimal (BR standard)
@@ -234,19 +244,46 @@ export default function CaseDetailsPage() {
                 if (!isNaN(floatVal)) {
                     return floatVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 }
-                return String(val);
+                return strVal;
             } catch (e) {
-                return String(val);
+                return strVal;
             }
         };
 
         return {
             rowIndex,
             id: String(getValue(row, "Caso", "Chamado", "caso", "chamado") || caseId),
-            title: getValue(row, "Inconsistencias", "inconsistencias", "Descrição", "descricao")
-                ? "Inconsistência Identificada"
-                : String(getValue(row, "Caso", "Chamado", "caso", "chamado") || caseId),
-            description: String(row[descriptionField] || ""),
+            title: (() => {
+                // User Request: Title must match the link item (First Column)
+                if (headers && headers.length > 0) {
+                    const firstHeader = headers[0];
+                    if (row[firstHeader]) {
+                        const val = row[firstHeader];
+                        // Proactive Date Formatting for Title
+                        if (typeof val === 'string' && (/^\d{4}-\d{2}-\d{2}/.test(val) || /^\w{3} \w{3} \d{2} \d{4}/.test(val) || val.includes("GMT"))) {
+                            const d = new Date(val);
+                            if (!isNaN(d.getTime())) {
+                                return format(d, "dd/MM/yyyy", { locale: ptBR });
+                            }
+                        }
+                        return String(val);
+                    }
+                }
+
+                // Fallback (should rarely happen if headers exist)
+                // Fallback (should rarely happen if headers exist)
+                return "Detalhes do Caso";
+            })(),
+            description: (() => {
+                // User Request: Subtitle must be the second item (Second Column)
+                if (headers && headers.length > 1) {
+                    const secondHeader = headers[1];
+                    if (row[secondHeader]) {
+                        return String(row[secondHeader]);
+                    }
+                }
+                return String(row[descriptionField] || "");
+            })(),
             descriptionField,
             status: status,
 
@@ -278,7 +315,7 @@ export default function CaseDetailsPage() {
             value: valueKey ? formatMoney(row[valueKey]) : null,
             netValue: netValueKey ? formatMoney(row[netValueKey]) : null,
             paymentMethod: paymentMethodKey ? String(row[paymentMethodKey] || "") : "",
-            pcc: pccKey ? formatMoney(row[pccKey]) : null,
+            pcc: pccKey ? String(row[pccKey] || "") : null,
             ir: irKey ? formatMoney(row[irKey]) : null,
             issBase: issBaseKey ? formatMoney(row[issBaseKey]) : null,
 
@@ -815,27 +852,97 @@ export default function CaseDetailsPage() {
 
 
                         {/* Documentos Relacionados */}
+                        {/* Documentos Relacionados */}
                         <Card className="overflow-hidden shadow-sm border-muted/40">
                             <CardHeader className="border-b bg-muted/10 px-4 py-3 flex flex-row items-center justify-between">
                                 <CardTitle className="text-base font-bold">Documentos Relacionados</CardTitle>
-                                <Button variant="ghost" size="sm" className="text-primary font-bold hover:text-primary hover:bg-primary/10 gap-1">
-                                    <Plus className="h-4 w-4" />
-                                    Adicionar
-                                </Button>
+                                <div>
+                                    <input
+                                        type="file"
+                                        id="doc-upload"
+                                        className="hidden"
+                                        multiple
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files.length > 0) {
+                                                const newDocs = Array.from(e.target.files).map(file => ({
+                                                    id: Math.random().toString(36).substr(2, 9),
+                                                    name: file.name,
+                                                    type: file.name.split('.').pop()?.toUpperCase() || 'FILE',
+                                                    size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+                                                    user: "Você", // Current user
+                                                    date: new Date().toLocaleDateString(),
+                                                    fileObj: file // Store the actual file object
+                                                }));
+                                                // In a real app, we would upload to server here.
+                                                // For now, we simulate adding to the list.
+                                                setDocuments(prev => [...prev, ...newDocs]);
+                                                toast.success("Documento Adicionado", `${newDocs.length} arquivo(s) anexado(s).`);
+                                            }
+                                        }}
+                                    />
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-primary font-bold hover:text-primary hover:bg-primary/10 gap-1"
+                                        onClick={() => document.getElementById('doc-upload')?.click()}
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                        Adicionar
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent className="p-2 space-y-1">
-                                <DocumentItem
-                                    icon={<FileSpreadsheet className="h-5 w-5 text-emerald-600" />}
-                                    bgClass="bg-emerald-100 dark:bg-emerald-900/20"
-                                    name="Planilha_Consolidada.xlsx"
-                                    meta="Excel • 2.4 MB • Por João Silva"
-                                />
-                                <DocumentItem
-                                    icon={<FileText className="h-5 w-5 text-red-600" />}
-                                    bgClass="bg-red-100 dark:bg-red-900/20"
-                                    name="Relatorio_Final.pdf"
-                                    meta="PDF • 1.1 MB • Por Sistema"
-                                />
+                                {documents.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground border-2 border-dashed border-gray-100 rounded-md m-2">
+                                        <Upload className="h-8 w-8 text-gray-300 mb-2" />
+                                        <p className="text-sm font-medium">Nenhum documento anexado</p>
+                                        <p className="text-xs opacity-70">Clique em "Adicionar" para anexar arquivos</p>
+                                    </div>
+                                ) : (
+                                    documents.map((doc: any) => (
+                                        <DocumentItem
+                                            key={doc.id}
+                                            icon={
+                                                doc.type === 'XLSX' || doc.type === 'XLS' || doc.type === 'CSV' ? <FileSpreadsheet className="h-5 w-5 text-emerald-600" /> :
+                                                    doc.type === 'PDF' ? <FileText className="h-5 w-5 text-red-600" /> :
+                                                        doc.type === 'DOC' || doc.type === 'DOCX' ? <FileText className="h-5 w-5 text-blue-600" /> :
+                                                            <FileIcon className="h-5 w-5 text-gray-500" />
+                                            }
+                                            bgClass={
+                                                doc.type === 'XLSX' || doc.type === 'XLS' || doc.type === 'CSV' ? "bg-emerald-100 dark:bg-emerald-900/20" :
+                                                    doc.type === 'PDF' ? "bg-red-100 dark:bg-red-900/20" :
+                                                        "bg-gray-100 dark:bg-gray-800"
+                                            }
+                                            name={doc.name}
+                                            meta={`${doc.type} • ${doc.size} • Por ${doc.user}`}
+                                            onView={() => {
+                                                if (doc.fileObj) {
+                                                    const url = URL.createObjectURL(doc.fileObj);
+                                                    window.open(url, '_blank');
+                                                } else {
+                                                    toast.error("Visualização Indisponível", "O arquivo original não está acessível.");
+                                                }
+                                            }}
+                                            onDownload={() => {
+                                                if (doc.fileObj) {
+                                                    const url = URL.createObjectURL(doc.fileObj);
+                                                    const link = document.createElement('a');
+                                                    link.href = url;
+                                                    link.download = doc.name;
+                                                    document.body.appendChild(link);
+                                                    link.click();
+                                                    document.body.removeChild(link);
+                                                } else {
+                                                    toast.error("Download Indisponível", "O arquivo original não está acessível.");
+                                                }
+                                            }}
+                                            onDelete={() => {
+                                                setDocuments(prev => prev.filter(d => d.id !== doc.id));
+                                                toast.success("Documento Removido", "O arquivo foi excluído da lista.");
+                                            }}
+                                        />
+                                    ))
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -968,25 +1075,34 @@ function CollapsibleCard({ title, defaultOpen = true, children }: { title: strin
     );
 }
 
-function DocumentItem({ icon, bgClass, name, meta }: { icon: React.ReactNode, bgClass: string, name: string, meta: string }) {
+function DocumentItem({ icon, bgClass, name, meta, onView, onDownload, onDelete }: { icon: React.ReactNode, bgClass: string, name: string, meta: string, onView?: () => void, onDownload?: () => void, onDelete?: () => void }) {
     return (
         <div className="flex items-center justify-between p-3 hover:bg-muted/50 transition-colors rounded-lg group cursor-pointer">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4" onClick={onView}>
                 <div className={cn("p-2 rounded-lg", bgClass)}>
                     {icon}
                 </div>
                 <div>
-                    <p className="font-semibold text-sm">{name}</p>
-                    <p className="text-xs text-muted-foreground">{meta}</p>
+                    <div className="font-semibold text-sm text-foreground hover:underline decoration-primary decoration-2 underline-offset-4">{name}</div>
+                    <div className="text-xs text-muted-foreground">{meta}</div>
                 </div>
             </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
-                    <Eye className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
-                    <Download className="h-4 w-4" />
-                </Button>
+            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                {onView && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); onView(); }}>
+                        <Eye className="h-4 w-4" />
+                    </Button>
+                )}
+                {onDownload && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); onDownload(); }}>
+                        <Download className="h-4 w-4" />
+                    </Button>
+                )}
+                {onDelete && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                )}
             </div>
         </div>
     );

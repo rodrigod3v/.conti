@@ -30,9 +30,12 @@ export default function Home() {
                 const text = textDecoder.decode(buffer);
                 const lines = text.split('\n').filter(line => line.trim());
                 if (lines.length > 0) {
-                    const headers = lines[0].split(',').map(h => h.trim());
+                    const firstLine = lines[0];
+                    const separator = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+
+                    const headers = firstLine.split(separator).map(h => h.trim());
                     jsonData = lines.slice(1).map(line => {
-                        const values = line.split(',');
+                        const values = line.split(separator);
                         const row: any = {};
                         headers.forEach((header, index) => {
                             row[header] = values[index]?.trim() || '';
@@ -59,105 +62,126 @@ export default function Home() {
                 await workbook.xlsx.load(buffer);
 
                 // Iterate over ALL sheets
+                // Iterate over ALL sheets
                 workbook.eachSheet((worksheet, sheetId) => {
-                    const currentSheetRows: any[] = [];
+                    const worksheetName = worksheet.name;
+                    if (worksheet) {
+                        const currentSheetRows: any[] = [];
 
-                    // --- Smart Header Detection ---
-                    let bestHeaderRow = 1;
-                    let maxScore = -1;
-                    let bestHeaders: string[] = [];
+                        // --- SMART CSV DETECTION (Robust) ---
+                        // Check first non-empty row to see if it's a semicolon-separated mess
+                        const firstRow = worksheet.getRow(1);
+                        const firstCellText = firstRow.getCell(1).text || "";
+                        const semicolonCount = (firstCellText.match(/;/g) || []).length;
 
-                    // Scan first 50 rows to find the best header candidate
-                    for (let r = 1; r <= Math.min(50, worksheet.rowCount); r++) {
-                        const row = worksheet.getRow(r);
-                        if (row.actualCellCount === 0) continue;
+                        // Condition: Relaxed logic.
+                        // If we have >= 3 semicolons in the first cell, assume it's a CSV paste.
+                        // Legit headers almost never have 3+ semicolons.
+                        // We ignore the second cell state because it might contain phantom data/spaces.
+                        const looksLikeSemicolonCSV = semicolonCount >= 3 || (semicolonCount >= 1 && firstCellText.includes(";") && (!firstRow.getCell(2).text?.trim()));
 
-                        let score = 0;
-                        let rowHeaders: string[] = [];
-                        let nonEmptyCount = 0;
+                        if (looksLikeSemicolonCSV) {
+                            // --- REPAIR MODE: Split by Semicolon ---
+                            const headers = firstCellText.split(";").map(h => h.trim());
 
-                        row.eachCell((cell, colNumber) => {
-                            const val = cell.value?.toString().toLowerCase().trim() || "";
-                            if (val) nonEmptyCount++;
+                            worksheet.eachRow((row, rowNumber) => {
+                                if (rowNumber === 1) return; // Skip header
 
-                            // Boost score for known keywords
-                            if (val.includes("data") || val.includes("date")) score += 2;
-                            if (val.includes("status") || val.includes("estado")) score += 2;
-                            if (val.includes("valor") || val.includes("montante") || val.includes("amount") || val.includes("total")) score += 2;
-                            if (val.includes("nome") || val.includes("name") || val.includes("responsavel")) score += 2;
-                            if (val.includes("chamado") || val.includes("caso") || val.includes("id")) score += 2;
+                                // Get the raw line from the first cell
+                                const rowContent = row.getCell(1).text || "";
+                                if (!rowContent.trim()) return;
 
-                            // Penalty for numbers (headers are usually text)
-                            if (/^\d+$/.test(val)) score -= 1;
+                                const values = rowContent.split(";");
+                                const rowObject: any = {};
 
-                            rowHeaders[colNumber] = cell.value?.toString() || `Column${colNumber}`;
-                        });
+                                headers.forEach((header, index) => {
+                                    let val = values[index]?.trim();
+                                    rowObject[header] = val;
+                                });
+                                currentSheetRows.push(rowObject);
+                            });
 
-                        // Base score: density
-                        score += nonEmptyCount;
+                            if (currentSheetRows.length >= 0) {
+                                sheetsData[worksheetName] = {
+                                    data: currentSheetRows,
+                                    headers: headers.filter(h => h && h.trim() !== '')
+                                };
+                            }
 
-                        if (score > maxScore) {
-                            maxScore = score;
-                            bestHeaderRow = r;
-                            bestHeaders = rowHeaders;
-                        }
-                    }
+                        } else {
+                            // --- STANDARD EXCEL PARSING (Existing Logic) ---
+                            // Smart Header Detection
+                            let bestHeaderRow = 1;
+                            let maxScore = -1;
+                            let bestHeaders: string[] = [];
 
-                    // Fill sparse array gaps in bestHeaders
-                    for (let i = 1; i < bestHeaders.length; i++) {
-                        if (!bestHeaders[i]) bestHeaders[i] = `Column${i}`;
-                    }
+                            // Scan first 50 rows
+                            for (let r = 1; r <= Math.min(50, worksheet.rowCount); r++) {
+                                const row = worksheet.getRow(r);
+                                if (row.actualCellCount === 0) continue;
 
-                    // Fallback to Row 1 if nothing reasonable found
-                    if (maxScore <= 0) {
-                        const row = worksheet.getRow(1);
-                        row.eachCell((cell, colNumber) => {
-                            bestHeaders[colNumber] = cell.value?.toString() || `Column${colNumber}`;
-                        });
-                        bestHeaderRow = 1;
-                    }
+                                let score = 0;
+                                let rowHeaders: string[] = [];
+                                let nonEmptyCount = 0;
 
-                    // Extract Data using the Best Header Row
-                    worksheet.eachRow((row, rowNumber) => {
-                        if (rowNumber > bestHeaderRow) {
-                            const rowData: any = {};
-                            let hasData = false;
+                                row.eachCell((cell, colNumber) => {
+                                    const val = cell.value?.toString().toLowerCase().trim() || "";
+                                    if (val) nonEmptyCount++;
+                                    if (val.includes("data") || val.includes("date") || val.includes("status") || val.includes("valor") || val.includes("total") || val.includes("chamado") || val.includes("id")) score += 2;
+                                    if (/^\d+$/.test(val)) score -= 1;
+                                    rowHeaders[colNumber] = cell.value?.toString() || `Column${colNumber}`;
+                                });
+                                score += nonEmptyCount;
 
-                            row.eachCell((cell, colNumber) => {
-                                const header = bestHeaders[colNumber];
-                                if (header) {
-                                    let cellValue: any = cell.value;
-                                    // Handle formulas
-                                    if (cellValue && typeof cellValue === 'object' && 'result' in cellValue) {
-                                        cellValue = cellValue.result;
-                                    }
-                                    // Handle rich text
-                                    if (cellValue && typeof cellValue === 'object' && 'richText' in cellValue) {
-                                        cellValue = (cellValue as any).richText.map((rt: any) => rt.text).join('');
-                                    }
+                                if (score > maxScore) {
+                                    maxScore = score;
+                                    bestHeaderRow = r;
+                                    bestHeaders = rowHeaders;
+                                }
+                            }
 
-                                    rowData[header] = cellValue;
+                            // Fill gaps
+                            for (let i = 1; i < bestHeaders.length; i++) {
+                                if (!bestHeaders[i]) bestHeaders[i] = `Column${i}`;
+                            }
+                            if (maxScore <= 0) {
+                                const row = worksheet.getRow(1);
+                                row.eachCell((cell, colNumber) => {
+                                    bestHeaders[colNumber] = cell.value?.toString() || `Column${colNumber}`;
+                                });
+                                bestHeaderRow = 1;
+                            }
 
-                                    // Check if truly non-empty
-                                    if (cellValue !== null && cellValue !== undefined && String(cellValue).trim() !== '') {
-                                        hasData = true;
-                                    }
+                            // Parse Data
+                            worksheet.eachRow((row, rowNumber) => {
+                                if (rowNumber > bestHeaderRow) {
+                                    const rowData: any = {};
+                                    let hasData = false;
+                                    row.eachCell((cell, colNumber) => {
+                                        const header = bestHeaders[colNumber];
+                                        if (header) {
+                                            let cellValue: any = cell.value;
+                                            if (cellValue && typeof cellValue === 'object') {
+                                                if ('result' in cellValue) cellValue = cellValue.result;
+                                                else if ('text' in cellValue) cellValue = cellValue.text;
+                                                else if ('richText' in cellValue) cellValue = (cellValue as any).richText.map((rt: any) => rt.text).join('');
+                                                else cellValue = String(cellValue);
+                                            }
+                                            rowData[header] = cellValue;
+                                            if (cellValue !== null && cellValue !== undefined && String(cellValue).trim() !== '') hasData = true;
+                                        }
+                                    });
+                                    if (hasData) currentSheetRows.push(rowData);
                                 }
                             });
 
-                            if (hasData) {
-                                currentSheetRows.push(rowData);
+                            if (currentSheetRows.length >= 0) {
+                                sheetsData[worksheetName] = {
+                                    data: currentSheetRows,
+                                    headers: bestHeaders.filter(h => h && h.trim() !== '')
+                                };
                             }
                         }
-                    });
-
-                    // Always keep the sheet unless it's completely empty AND nameless? 
-                    // No, existing logic was to keep if headers found. Now we always try to find something.
-                    if (currentSheetRows.length >= 0) {
-                        sheetsData[worksheet.name] = {
-                            data: currentSheetRows,
-                            headers: bestHeaders.filter(h => h && h.trim() !== '')
-                        };
                     }
                 });
             }
