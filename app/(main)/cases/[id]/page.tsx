@@ -34,6 +34,7 @@ import {
     AlignLeft,
 
 } from "lucide-react";
+import { getStatusColor } from "@/lib/status-utils";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -214,7 +215,30 @@ export default function CaseDetailsPage() {
             }
         });
 
-        const status = statusKey ? String(row[statusKey] || "Pendente") : "Pendente";
+        const status = statusKey ? String(row[statusKey] || "") : "";
+
+        // Helper to format currency values inside useMemo
+        const formatMoney = (val: any) => {
+            if (val === undefined || val === null || String(val).trim() === "") return null;
+            try {
+                // Normalize, same logic as otherFields
+                const clean = String(val).replace(/[^\d,\.-]/g, "");
+                if (!clean) return String(val);
+
+                let floatVal = parseFloat(clean);
+                // If it had a comma and no dot, assume comma is decimal (BR standard)
+                if (clean.includes(',') && !clean.includes('.')) {
+                    floatVal = parseFloat(clean.replace(',', '.'));
+                }
+
+                if (!isNaN(floatVal)) {
+                    return floatVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+                return String(val);
+            } catch (e) {
+                return String(val);
+            }
+        };
 
         return {
             rowIndex,
@@ -250,13 +274,13 @@ export default function CaseDetailsPage() {
             openedAt: openedAtKey ? String(row[openedAtKey] || "") : "",
             dueDate: dueDateKey ? String(row[dueDateKey] || "") : "",
 
-            // Financial
-            value: valueKey ? row[valueKey] : null,
-            netValue: netValueKey ? row[netValueKey] : null,
+            // Financial - Now Formatted!
+            value: valueKey ? formatMoney(row[valueKey]) : null,
+            netValue: netValueKey ? formatMoney(row[netValueKey]) : null,
             paymentMethod: paymentMethodKey ? String(row[paymentMethodKey] || "") : "",
-            pcc: pccKey ? row[pccKey] : null,
-            ir: irKey ? row[irKey] : null,
-            issBase: issBaseKey ? row[issBaseKey] : null,
+            pcc: pccKey ? formatMoney(row[pccKey]) : null,
+            ir: irKey ? formatMoney(row[irKey]) : null,
+            issBase: issBaseKey ? formatMoney(row[issBaseKey]) : null,
 
             otherFields,
             // DEBUG: Return raw row keys for finding the correct column names
@@ -381,17 +405,14 @@ export default function CaseDetailsPage() {
                             <h1 className="text-2xl font-black tracking-tight text-foreground">
                                 {caseData.title}
                             </h1>
-                            <Badge className={cn(
-                                "px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border-none",
-                                caseData.status.toLowerCase().includes("pendente") && "bg-amber-100 text-amber-700",
-                                caseData.status.toLowerCase().includes("erro") && "bg-red-100 text-red-700",
-                                (caseData.status.toLowerCase().includes("aprovado") || caseData.status.toLowerCase().includes("resolvido") || caseData.status.toLowerCase().includes("pago") && !caseData.status.toLowerCase().includes("parcial")) && "bg-emerald-100 text-emerald-700",
-                                caseData.status.toLowerCase().includes("parcialmente") && "bg-blue-100 text-blue-700",
-                                (caseData.status.toLowerCase().includes("análise") || caseData.status.toLowerCase().includes("analise")) && "bg-indigo-100 text-indigo-700",
-                                caseData.status.toLowerCase().includes("cancelado") && "bg-slate-100 text-slate-700"
-                            )}>
-                                {caseData.status}
-                            </Badge>
+                            {caseData.status && (
+                                <Badge className={cn(
+                                    "px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border-none",
+                                    getStatusColor(caseData.status)
+                                )}>
+                                    {caseData.status}
+                                </Badge>
+                            )}
                         </div>
                         <p className="text-muted-foreground text-sm">
                             {caseData.description}
@@ -764,15 +785,21 @@ export default function CaseDetailsPage() {
                         )}
 
                         {/* Informações Gerais - Dynamic Group */}
-                        <CollapsibleCard title="Informações Gerais" defaultOpen>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {caseData.client && caseData.client !== "N/A" && <InfoItem label="Cliente" value={caseData.client} />}
-                                {caseData.openedAt && caseData.openedAt !== "-" && <InfoItem label="Data" value={caseData.openedAt} />}
-                                {caseData.dueDate && caseData.dueDate !== "-" && <InfoItem label="Vencimento" value={caseData.dueDate} />}
-                                {caseData.responsible && caseData.responsible !== "Não atribuído" && <InfoItem label="Responsável" value={caseData.responsible} />}
-                                {caseData.period && <InfoItem label="Período" value={caseData.period} />}
-                            </div>
-                        </CollapsibleCard>
+                        {((caseData.client && caseData.client !== "N/A") ||
+                            (caseData.openedAt && caseData.openedAt !== "-") ||
+                            (caseData.dueDate && caseData.dueDate !== "-") ||
+                            (caseData.responsible && caseData.responsible !== "Não atribuído") ||
+                            caseData.period) && (
+                                <CollapsibleCard title="Informações Gerais" defaultOpen>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {caseData.client && caseData.client !== "N/A" && <InfoItem label="Cliente" value={caseData.client} />}
+                                        {caseData.openedAt && caseData.openedAt !== "-" && <InfoItem label="Data" value={caseData.openedAt} />}
+                                        {caseData.dueDate && caseData.dueDate !== "-" && <InfoItem label="Vencimento" value={caseData.dueDate} />}
+                                        {caseData.responsible && caseData.responsible !== "Não atribuído" && <InfoItem label="Responsável" value={caseData.responsible} />}
+                                        {caseData.period && <InfoItem label="Período" value={caseData.period} />}
+                                    </div>
+                                </CollapsibleCard>
+                            )}
 
                         {/* Outros Detalhes - Totally dynamic */}
                         {caseData.otherFields && caseData.otherFields.length > 0 && (

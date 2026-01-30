@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useAppStore } from "@/lib/store";
+import { getStatusColor } from "@/lib/status-utils";
 import {
     Table,
     TableBody,
@@ -60,32 +61,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // --- Helper Components ---
 
 const StatusBadge = ({ status }: { status: string }) => {
-    // Normalizing status for comparison
-    const s = status?.toString().toLowerCase().trim() || "";
-
-    if (s.includes("pago") && !s.includes("parcial")) {
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">{status}</Badge>;
-    }
-    if (s.includes("parcialmente") || s.includes("parcial")) {
-        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">{status}</Badge>;
-    }
-    if (s.includes("cancelado")) {
-        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-none">{status}</Badge>;
-    }
-    if (s === "pendente" || s.includes("aguardando")) {
-        return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none">{status}</Badge>;
-    }
-    if (s === "aprovado" || s === "concluído" || s === "concluido" || s === "resolvido" || s === "ok") {
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">{status}</Badge>;
-    }
-    if (s === "erro" || s === "missing") {
-        return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-none">{status}</Badge>;
-    }
-    if (s.includes("análise") || s.includes("analise") || s.includes("andamento")) {
-        return <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-none">{status}</Badge>;
-    }
-
-    return <Badge variant="secondary">{status}</Badge>;
+    return <Badge className={`${getStatusColor(status)} border-none`}>{status}</Badge>;
 };
 
 const ActionsCell = ({ rowId }: { rowId: number }) => {
@@ -588,24 +564,43 @@ export function DataEditor() {
     };
 
     const handleExport = async () => {
-        if (!fileData || fileData.length === 0) return;
+        const { fileData, headers, fileName, sheets } = useAppStore.getState();
+        if ((!fileData || fileData.length === 0) && (!sheets || Object.keys(sheets).length === 0)) return;
 
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet("Dados");
 
-        // Add headers
-        if (headers && headers.length > 0) {
-            worksheet.columns = headers.map(header => ({
-                header: header,
-                key: header,
-                width: 15
-            }));
+        if (sheets && Object.keys(sheets).length > 0) {
+            Object.entries(sheets).forEach(([sheetName, sheetContent]) => {
+                // Sanitize sheet name (Excel max 31 chars, no special chars)
+                const safeName = sheetName.replace(/[\\/?*[\]]/g, "").substring(0, 31) || "Sheet";
+                const worksheet = workbook.addWorksheet(safeName);
+
+                if (sheetContent.headers && sheetContent.headers.length > 0) {
+                    worksheet.columns = sheetContent.headers.map(header => ({
+                        header: header,
+                        key: header,
+                        width: 15
+                    }));
+                }
+
+                sheetContent.data.forEach(row => {
+                    worksheet.addRow(row);
+                });
+            });
+        } else {
+            // Fallback for single sheet legacy support
+            const worksheet = workbook.addWorksheet("Dados");
+            if (headers && headers.length > 0) {
+                worksheet.columns = headers.map(header => ({
+                    header: header,
+                    key: header,
+                    width: 15
+                }));
+            }
+            fileData.forEach(row => {
+                worksheet.addRow(row);
+            });
         }
-
-        // Add data rows
-        fileData.forEach(row => {
-            worksheet.addRow(row);
-        });
 
         // Generate file
         const exportName = fileName ? `${fileName.replace(/\.[^/.]+$/, "")}_editado.xlsx` : "dados_exportados.xlsx";
@@ -748,6 +743,32 @@ export function DataEditor() {
             </div>
 
             <NewCaseWizard open={isWizardOpen} onOpenChange={setIsWizardOpen} />
+
+            {/* Sheets Tabs */}
+            {sheets && Object.keys(sheets).length > 1 && (
+                <div className="shrink-0 mb-2">
+                    <Tabs
+                        value={activeSheet || Object.keys(sheets)[0]}
+                        onValueChange={(val) => changeSheet(val)}
+                        className="w-full"
+                    >
+                        <TabsList className="w-full justify-start h-10 bg-transparent border-b rounded-none p-0 space-x-2">
+                            {Object.keys(sheets).map((sheetName) => (
+                                <TabsTrigger
+                                    key={sheetName}
+                                    value={sheetName}
+                                    className="data-[state=active]:bg-background data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2 h-10 border-b-2 border-transparent transition-all"
+                                >
+                                    {sheetName}
+                                    <span className="ml-2 text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full opacity-70">
+                                        {sheets[sheetName].data.length}
+                                    </span>
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
+                </div>
+            )}
 
             {/* Filters Section */}
             <div className="flex flex-col gap-3 rounded-lg border bg-card p-2 md:flex-row md:items-center bg-white shrink-0">

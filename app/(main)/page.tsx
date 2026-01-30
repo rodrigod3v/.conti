@@ -62,68 +62,101 @@ export default function Home() {
                 workbook.eachSheet((worksheet, sheetId) => {
                     const currentSheetRows: any[] = [];
 
-                    // Dynamic Header Detection: Find first row with content
-                    let headerRowIndex = 1;
-                    let headers: string[] = [];
-                    let foundHeaders = false;
+                    // --- Smart Header Detection ---
+                    let bestHeaderRow = 1;
+                    let maxScore = -1;
+                    let bestHeaders: string[] = [];
 
-                    // Scan first 50 rows for header candidates
-                    for (let r = 1; r <= 50; r++) {
+                    // Scan first 50 rows to find the best header candidate
+                    for (let r = 1; r <= Math.min(50, worksheet.rowCount); r++) {
                         const row = worksheet.getRow(r);
-                        if (row.actualCellCount > 0) {
-                            // Assume this is the header row
-                            headerRowIndex = r;
-                            foundHeaders = true;
+                        if (row.actualCellCount === 0) continue;
 
-                            row.eachCell((cell, colNumber) => {
-                                headers[colNumber] = cell.value?.toString() || `Column${colNumber}`;
-                            });
-                            // Fill sparse array gaps
-                            for (let i = 1; i < headers.length; i++) {
-                                if (!headers[i]) headers[i] = `Column${i}`;
-                            }
-                            break;
+                        let score = 0;
+                        let rowHeaders: string[] = [];
+                        let nonEmptyCount = 0;
+
+                        row.eachCell((cell, colNumber) => {
+                            const val = cell.value?.toString().toLowerCase().trim() || "";
+                            if (val) nonEmptyCount++;
+
+                            // Boost score for known keywords
+                            if (val.includes("data") || val.includes("date")) score += 2;
+                            if (val.includes("status") || val.includes("estado")) score += 2;
+                            if (val.includes("valor") || val.includes("montante") || val.includes("amount") || val.includes("total")) score += 2;
+                            if (val.includes("nome") || val.includes("name") || val.includes("responsavel")) score += 2;
+                            if (val.includes("chamado") || val.includes("caso") || val.includes("id")) score += 2;
+
+                            // Penalty for numbers (headers are usually text)
+                            if (/^\d+$/.test(val)) score -= 1;
+
+                            rowHeaders[colNumber] = cell.value?.toString() || `Column${colNumber}`;
+                        });
+
+                        // Base score: density
+                        score += nonEmptyCount;
+
+                        if (score > maxScore) {
+                            maxScore = score;
+                            bestHeaderRow = r;
+                            bestHeaders = rowHeaders;
                         }
                     }
 
-                    // Fallback: If no headers found in 50 rows, try Row 1 anyway
-                    if (!foundHeaders) {
-                        headerRowIndex = 1;
-                        const row = worksheet.getRow(1);
-                        row.eachCell((cell, colNumber) => {
-                            headers[colNumber] = cell.value?.toString() || `Column${colNumber}`;
-                        });
-                        foundHeaders = true;
+                    // Fill sparse array gaps in bestHeaders
+                    for (let i = 1; i < bestHeaders.length; i++) {
+                        if (!bestHeaders[i]) bestHeaders[i] = `Column${i}`;
                     }
 
-                    if (foundHeaders) {
-                        worksheet.eachRow((row, rowNumber) => {
-                            if (rowNumber > headerRowIndex) {
-                                const rowData: any = {};
-                                row.eachCell((cell, colNumber) => {
-                                    const header = headers[colNumber];
-                                    if (header) {
-                                        let cellValue: any = cell.value;
-                                        if (cellValue && typeof cellValue === 'object' && 'result' in cellValue) {
-                                            cellValue = cellValue.result;
-                                        }
-                                        if (cellValue && typeof cellValue === 'object' && 'richText' in cellValue) {
-                                            cellValue = (cellValue as any).richText.map((rt: any) => rt.text).join('');
-                                        }
-                                        rowData[header] = cellValue;
-                                    }
-                                });
-                                // Relaxed Empty Check: Keep row if at least one value exists
-                                if (Object.values(rowData).some(val => val !== null && val !== undefined && val !== '' && String(val).trim() !== '')) {
-                                    currentSheetRows.push(rowData);
-                                }
-                            }
+                    // Fallback to Row 1 if nothing reasonable found
+                    if (maxScore <= 0) {
+                        const row = worksheet.getRow(1);
+                        row.eachCell((cell, colNumber) => {
+                            bestHeaders[colNumber] = cell.value?.toString() || `Column${colNumber}`;
                         });
+                        bestHeaderRow = 1;
+                    }
 
-                        // Always keep the sheet, even if empty, so the user sees the tab
+                    // Extract Data using the Best Header Row
+                    worksheet.eachRow((row, rowNumber) => {
+                        if (rowNumber > bestHeaderRow) {
+                            const rowData: any = {};
+                            let hasData = false;
+
+                            row.eachCell((cell, colNumber) => {
+                                const header = bestHeaders[colNumber];
+                                if (header) {
+                                    let cellValue: any = cell.value;
+                                    // Handle formulas
+                                    if (cellValue && typeof cellValue === 'object' && 'result' in cellValue) {
+                                        cellValue = cellValue.result;
+                                    }
+                                    // Handle rich text
+                                    if (cellValue && typeof cellValue === 'object' && 'richText' in cellValue) {
+                                        cellValue = (cellValue as any).richText.map((rt: any) => rt.text).join('');
+                                    }
+
+                                    rowData[header] = cellValue;
+
+                                    // Check if truly non-empty
+                                    if (cellValue !== null && cellValue !== undefined && String(cellValue).trim() !== '') {
+                                        hasData = true;
+                                    }
+                                }
+                            });
+
+                            if (hasData) {
+                                currentSheetRows.push(rowData);
+                            }
+                        }
+                    });
+
+                    // Always keep the sheet unless it's completely empty AND nameless? 
+                    // No, existing logic was to keep if headers found. Now we always try to find something.
+                    if (currentSheetRows.length >= 0) {
                         sheetsData[worksheet.name] = {
                             data: currentSheetRows,
-                            headers: headers.filter(h => h && h.trim() !== '')
+                            headers: bestHeaders.filter(h => h && h.trim() !== '')
                         };
                     }
                 });
@@ -229,8 +262,15 @@ export default function Home() {
                 // For now, let's just save the file metadata and use `setSheets` for local state.
 
                 // Note: The /api/files endpoint might expect `rows`. We'll send the FIRST sheet's rows.
-                const firstSheetName = Object.keys(finalSheets)[0];
-                const firstSheetData = finalSheets[firstSheetName];
+                // Flatten all sheets into a single array for DB persistence
+                // We add a "__sheetName__" property to each row so we can reconstruct them later
+                const allRowsForDB: any[] = [];
+
+                Object.keys(finalSheets).forEach(sheetName => {
+                    const rows = finalSheets[sheetName].data;
+                    const rowsWithMeta = rows.map(r => ({ ...r, __sheetName__: sheetName }));
+                    allRowsForDB.push(...rowsWithMeta);
+                });
 
                 try {
                     const response = await fetch('/api/files', {
@@ -239,7 +279,7 @@ export default function Home() {
                         body: JSON.stringify({
                             name: file.name,
                             size: file.size,
-                            rows: firstSheetData.data // Saving first sheet to keep API happy
+                            rows: allRowsForDB // Saving ALL sheets with metadata
                         })
                     });
 
