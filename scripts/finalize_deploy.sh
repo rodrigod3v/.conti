@@ -44,10 +44,17 @@ sudo chmod -R 755 ~/app
 # 6. Start
 cd ~/app
 # Reinstall node_modules if needed
-npm install --omit=dev
+# Reinstall dependencies (force install all to get correct Prisma CLI)
+npm install
 
 echo "Generating Prisma Client..."
 npx prisma generate
+
+echo "Pushing DB Schema..."
+npx prisma db push
+
+echo "Pruning dev dependencies..."
+npm prune --production
 
 echo "Starting with PM2..."
 pm2 start server.js --name "next-app"

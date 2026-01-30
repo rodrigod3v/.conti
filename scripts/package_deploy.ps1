@@ -8,11 +8,12 @@ if (Test-Path $deployZip) { Remove-Item -Force $deployZip }
 
 # Create structure
 New-Item -ItemType Directory -Force -Path $deployDir | Out-Null
-New-Item -ItemType Directory -Force -Path "$deployDir\.next" | Out-Null
 
 # 1. Copy Standalone (Base)
 Write-Host "Copying Standalone..."
 Copy-Item -Recurse "$baseDir\.next\standalone\*" -Destination $deployDir
+# Remove node_modules to force fresh install on Linux (avoids OS mismatch)
+if (Test-Path "$deployDir\node_modules") { Remove-Item -Recurse -Force "$deployDir\node_modules" }
 
 # 2. Copy Static Assets (REQUIRED)
 Write-Host "Copying Static Assets..."

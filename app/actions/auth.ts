@@ -43,7 +43,7 @@ export async function login(prevState: any, formData: FormData) {
         const cookieStore = await cookies();
         cookieStore.set("session_user", user.id, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: false, // process.env.NODE_ENV === "production", <--- Fixed for HTTP VM
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: "/",
         });
@@ -91,7 +91,7 @@ export async function register(prevState: any, formData: FormData) {
         const cookieStore = await cookies();
         cookieStore.set("session_user", user.id, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: false, // process.env.NODE_ENV === "production", <--- Fixed for HTTP VM
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: "/",
         });
