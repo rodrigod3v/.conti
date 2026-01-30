@@ -31,9 +31,16 @@ O coração da manipulação de dados. Ao editar um caso, a interface se molda a
 *   **Excel no Navegador**: Visualize o conteúdo de arquivos anexados sem precisar baixá-los.
 *   **Fallback Robusto**: Se o arquivo não puder ser exibido, o download é oferecido automaticamente.
 
-### 4. Página de Detalhes & Timeline
-*   **Histórico Completo**: Acompanhe a evolução do caso com comentários e logs de alteração.
-*   **Organização Visual**: Badges de status coloridos e agrupamento lógico de informações.
+### 4. Configurações de Mapeamento (Novo)
+*   **Área de Ajustes**: Painel dedicado (`/settings`) para gerenciar as listas do sistema.
+*   **CRUD Intuitivo**: Adicione, edite ou remova opções de *Status*, *Equipes* e *Empresas*.
+*   **Herança de Dados**: Importe valores existentes das planilhas para popular as configurações iniciais.
+
+### 5. Navegação & HUD Unificado
+*   **Dashboard Moderno**: Header com ações rápidas para *Importar Planilha* e *Novo Caso*.
+*   **Editor Fluido**:
+    *   **Barra de Ferramentas Integrada**: Filtros avançados, busca e ações ("Novo", "Salvar") em um único HUD.
+    *   **Filtros Dinâmicos**: Dropdowns que se ajustam ao conteúdo e busca global por texto.
 
 ---
 
