@@ -40,7 +40,11 @@ interface AppState {
       statusColors: Record<string, string>;
       companies: Company[];
   };
+  sheets: Record<string, { data: DataRow[], headers: string[] }>;
+  activeSheet: string | null;
   setFileData: (data: DataRow[], headers: string[], fileName: string, fileId?: string | null) => void;
+  setSheets: (sheets: Record<string, { data: DataRow[], headers: string[] }>, fileName: string, fileId?: string | null) => void;
+  changeSheet: (sheetName: string) => void;
   updateCell: (rowIndex: number, column: string, value: string | number) => void;
   addRow: (row: DataRow) => void;
   deleteRow: (rowIndex: number) => void;
@@ -70,22 +74,83 @@ export const useAppStore = create<AppState>()(
           statusColors: {},
           companies: []
       },
-      setFileData: (data, headers, fileName, fileId = null) => set({ fileData: data, headers, fileName, fileId }),
+      sheets: {},
+      activeSheet: null,
+      setFileData: (data, headers, fileName, fileId = null) => set({ 
+          fileData: data, 
+          headers, 
+          fileName, 
+          fileId,
+          // When setting single file data (legacy or CSV), we treat it as a single sheet named "Principal"
+          sheets: { "Principal": { data, headers } },
+          activeSheet: "Principal"
+      }),
+      setSheets: (sheets, fileName, fileId = null) => {
+          const firstSheetName = Object.keys(sheets)[0];
+          set({
+              sheets,
+              fileName,
+              fileId,
+              activeSheet: firstSheetName,
+              fileData: sheets[firstSheetName]?.data || [],
+              headers: sheets[firstSheetName]?.headers || []
+          });
+      },
+      changeSheet: (sheetName) => set((state) => {
+          const sheet = state.sheets[sheetName];
+          if (!sheet) return {};
+          return {
+              activeSheet: sheetName,
+              fileData: sheet.data,
+              headers: sheet.headers
+          };
+      }),
       updateCell: (rowIndex, column, value) =>
         set((state) => {
           const newData = [...state.fileData];
           newData[rowIndex] = { ...newData[rowIndex], [column]: value };
-          return { fileData: newData };
+          
+          // Sync back to sheets map if we have an active sheet
+          const newSheets = { ...state.sheets };
+          if (state.activeSheet && newSheets[state.activeSheet]) {
+              newSheets[state.activeSheet] = {
+                  ...newSheets[state.activeSheet],
+                  data: newData
+              };
+          }
+          
+          return { fileData: newData, sheets: newSheets };
         }),
       addRow: (row) =>
-        set((state) => ({
-          fileData: [row, ...state.fileData], // Add to top
-        })),
+        set((state) => {
+            const newData = [row, ...state.fileData];
+            
+            // Sync back to sheets map
+            const newSheets = { ...state.sheets };
+            if (state.activeSheet && newSheets[state.activeSheet]) {
+                newSheets[state.activeSheet] = {
+                    ...newSheets[state.activeSheet],
+                    data: newData
+                };
+            }
+
+            return { fileData: newData, sheets: newSheets };
+        }),
       deleteRow: (rowIndex) =>
         set((state) => {
             const newData = [...state.fileData];
             newData.splice(rowIndex, 1);
-            return { fileData: newData };
+
+            // Sync back to sheets map
+            const newSheets = { ...state.sheets };
+            if (state.activeSheet && newSheets[state.activeSheet]) {
+                newSheets[state.activeSheet] = {
+                    ...newSheets[state.activeSheet],
+                    data: newData
+                };
+            }
+
+            return { fileData: newData, sheets: newSheets };
         }),
       addComment: (caseId, text, user) =>
         set((state) => {
@@ -108,7 +173,7 @@ export const useAppStore = create<AppState>()(
           
           return { comments: newComments };
         }),
-      clearData: () => set({ fileData: [], headers: [], fileName: null, fileId: null, comments: {}, config: { team: [], statusColors: {}, companies: [] } }),
+      clearData: () => set({ fileData: [], headers: [], fileName: null, fileId: null, comments: {}, config: { team: [], statusColors: {}, companies: [] }, sheets: {}, activeSheet: null }),
       isSidebarOpen: true,
       toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 

@@ -55,6 +55,7 @@ import { useRouter } from "next/navigation";
 import ExcelJS from "exceljs";
 import { NewCaseWizard } from "@/components/features/new-case-wizard";
 import { useToast } from "@/components/ui/simple-toast";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // --- Helper Components ---
 
@@ -297,7 +298,22 @@ const EditableCell = ({
 
 export function DataEditor() {
     // ... (DataEditor START) ...
-    const { fileData, headers, fileName, updateCell, setFileData, clearData, deleteRow, config } = useAppStore();
+    const {
+        fileData,
+        headers,
+        fileName,
+        updateCell,
+        setFileData,
+        clearData,
+        deleteRow,
+        config,
+        addRow,
+        isSidebarOpen,
+        toggleSidebar,
+        sheets,
+        activeSheet,
+        changeSheet
+    } = useAppStore();
     const [isSaving, setIsSaving] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [isMounted, setIsMounted] = useState(false);
@@ -382,11 +398,19 @@ export function DataEditor() {
     }, [fileData]);
 
     // Compute unique values for ALL columns to populate Dropdowns
+    // We utilize a ref to ACCUMULATE values seen during the session
+    // This prevents options from disappearing if they are removed from the current table view
+    const seenValuesRef = useRef<Record<string, Set<string>>>({});
+
     const allUniqueValues = useMemo(() => {
-        const map: Record<string, string[]> = {};
-        if (!fileData) return map;
+        const map = seenValuesRef.current;
+        if (!fileData) return {}; // Return existing map if no data (though usually fileData is present)
+
         headers.forEach(h => {
-            const values = new Set<string>();
+            if (!map[h]) map[h] = new Set<string>();
+            const values = map[h];
+
+            // 1. Add current data values
             fileData.forEach(row => {
                 const val = row[h];
                 if (val !== undefined && val !== null && String(val).trim() !== "") {
@@ -394,7 +418,7 @@ export function DataEditor() {
                 }
             });
 
-            // --- Inject Config Values ---
+            // 2. Inject Config Values (Always present)
             if (h === "Responsável" || h === "Responsavel") {
                 config.team.filter(m => m.status === 'Ativo').forEach(m => values.add(m.name));
             }
@@ -405,16 +429,20 @@ export function DataEditor() {
                 config.companies.filter(c => c.status === 'Ativo').forEach(c => values.add(c.name));
             }
 
-            // Inject Custom Configured Options
+            // 3. Inject Custom Configured Options (From field-config.ts)
             const fieldConfig = getFieldConfig(h);
             if (fieldConfig.type === 'dropdown' && fieldConfig.options) {
                 fieldConfig.options.forEach(opt => values.add(opt));
             }
-            // ----------------------------
-
-            map[h] = Array.from(values).sort();
         });
-        return map;
+
+        // Convert Sets to sorted Arrays for rendering
+        const result: Record<string, string[]> = {};
+        Object.keys(map).forEach(key => {
+            result[key] = Array.from(map[key]).sort();
+        });
+
+        return result;
     }, [fileData, headers, config, configVersion]);
 
     const filteredData = useMemo(() => {
@@ -866,6 +894,7 @@ export function DataEditor() {
                                     const isSelected = selectedRows.has(globalIndex);
                                     const isError = String(row["Status"]).toLowerCase() === "erro" || String(row["Status"]).toLowerCase() === "missing";
 
+
                                     return (
                                         <TableRow
                                             key={globalIndex}
@@ -1039,6 +1068,6 @@ export function DataEditor() {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

@@ -28,12 +28,12 @@ export const fieldConfigurations: Record<string, FieldConfig> = {
     'Qtde': { type: 'numeric' },
     
     // Dropdown Fields
-    'Status': { type: 'dropdown' },
+    'Status': { type: 'dropdown', options: ['Pendente', 'Aprovado', 'Pago', 'Recusado', 'Em Análise', 'Erro'] },
     'Cliente': { type: 'dropdown' },
     'Responsável': { type: 'dropdown' },
     'Unidade': { type: 'dropdown' },
-    'Forma de Pagamento': { type: 'dropdown' },
-    'Categoria': { type: 'dropdown' },
+    'Forma de Pagamento': { type: 'dropdown', options: ['Boleto', 'PIX', 'Cartão de Crédito', 'Transferência'] },
+    'Categoria': { type: 'dropdown', options: ['Despesa', 'Receita'] },
     'Departamento': { type: 'dropdown' },
     'Setor': { type: 'dropdown' },
     'Produto': { type: 'dropdown' },

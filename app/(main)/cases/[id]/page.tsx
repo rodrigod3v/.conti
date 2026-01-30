@@ -37,6 +37,8 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
     Dialog,
     DialogContent,
@@ -159,7 +161,56 @@ export default function CaseDetailsPage() {
 
             const val = row[key];
             if (val !== undefined && val !== null && String(val).trim() !== "") {
-                otherFields.push({ label: key, value: String(val) });
+                let displayVal = String(val);
+
+                // Try to format if it's a date field
+                const isDateConfig = isDateField(key);
+
+                // Check if it looks like a date string (heuristic for unconfigured fields)
+                // Matches standard date string formats like "Tue Jan 27 2026..." or ISO
+                const isDateString = typeof val === 'string' &&
+                    (val.includes("GMT") || val.match(/^\d{4}-\d{2}-\d{2}/));
+
+                if (isDateConfig || isDateString) {
+                    try {
+                        const dateObj = new Date(String(val));
+                        if (!isNaN(dateObj.getTime())) {
+                            displayVal = format(dateObj, "dd/MM/yyyy", { locale: ptBR });
+                        }
+                    } catch (e) {
+                        // Keep original value if parsing fails
+                    }
+                } else {
+                    // Check for Currency (Configured OR Heuristic)
+                    const isCurrencyConfig = shouldFormatCurrency(key);
+                    const lowerKey = key.toLowerCase();
+                    // Heuristic: contains money keywords AND looks numeric
+                    // We allow comma as decimal separator or dot
+                    const isCurrencyHeuristic = (lowerKey.includes("valor") || lowerKey.includes("preco") || lowerKey.includes("custo") || lowerKey.includes("montante")) &&
+                        !lowerKey.includes("id") &&
+                        /^-?\d+(?:[.,]\d+)?$/.test(String(val).trim());
+
+                    if (isCurrencyConfig || isCurrencyHeuristic) {
+                        try {
+                            // Normalize to float for formatting
+                            const clean = String(val).replace(/[^\d,\.-]/g, "");
+                            let floatVal = parseFloat(clean);
+                            // If it had a comma and no dot, assume comma is decimal (BR standard)
+                            if (clean.includes(',') && !clean.includes('.')) {
+                                floatVal = parseFloat(clean.replace(',', '.'));
+                            }
+                            // If it has dot but no comma, standard float
+
+                            if (!isNaN(floatVal)) {
+                                displayVal = floatVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            }
+                        } catch (e) {
+                            // Keep original
+                        }
+                    }
+                }
+
+                otherFields.push({ label: key, value: displayVal });
             }
         });
 

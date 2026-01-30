@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/simple-toast";
 
 export default function Home() {
     const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
-    const { setFileData } = useAppStore();
+    const { setFileData, setSheets } = useAppStore();
     const router = useRouter();
     const toast = useToast();
 
@@ -20,6 +20,9 @@ export default function Home() {
         try {
             const buffer = await file.arrayBuffer();
             let jsonData: any[] = [];
+
+            // Dictionary to hold all sheets data
+            const sheetsData: Record<string, { data: any[], headers: string[] }> = {};
 
             // Handle CSV files
             if (file.name.endsWith(".csv") || file.type === "text/csv") {
@@ -36,45 +39,114 @@ export default function Home() {
                         });
                         return row;
                     });
+
+                    // Logic to process the single CSV sheet
+                    if (jsonData.length > 0) {
+                        // ... (Transformation logic reused or duplicated?)
+                        // Since CSV is simple, we can just process it here or assume the transformation logic below can be function-ized.
+                        // For simplicity, let's process it right here to reuse the final save block logic which we'll need to adapt.
+
+                        // Note: We need to standardize how we process rows to avoid code duplication with the Excel loop.
+                        // Let's create a helper function inside handleFileSelect or just process it.
+                    }
+                    // For CSV, we just create one sheet named "Planilha 1"
+                    // But wait, the existing code below (lines 75+) processes `jsonData`.
+                    // We need to support MULTIPLE `jsonData` arrays now.
                 }
             } else {
                 // Handle Excel files with ExcelJS
                 const workbook = new ExcelJS.Workbook();
                 await workbook.xlsx.load(buffer);
-                const worksheet = workbook.worksheets[0];
 
-                const headers: string[] = [];
-                const headerRow = worksheet.getRow(1);
-                headerRow.eachCell((cell, colNumber) => {
-                    headers.push(cell.value?.toString() || `Column${colNumber}`);
-                });
+                // Iterate over ALL sheets
+                workbook.eachSheet((worksheet, sheetId) => {
+                    const currentSheetRows: any[] = [];
 
-                worksheet.eachRow((row, rowNumber) => {
-                    if (rowNumber > 1) {
-                        const rowData: any = {};
+                    // Dynamic Header Detection: Find first row with content
+                    let headerRowIndex = 1;
+                    let headers: string[] = [];
+                    let foundHeaders = false;
+
+                    // Scan first 50 rows for header candidates
+                    for (let r = 1; r <= 50; r++) {
+                        const row = worksheet.getRow(r);
+                        if (row.actualCellCount > 0) {
+                            // Assume this is the header row
+                            headerRowIndex = r;
+                            foundHeaders = true;
+
+                            row.eachCell((cell, colNumber) => {
+                                headers[colNumber] = cell.value?.toString() || `Column${colNumber}`;
+                            });
+                            // Fill sparse array gaps
+                            for (let i = 1; i < headers.length; i++) {
+                                if (!headers[i]) headers[i] = `Column${i}`;
+                            }
+                            break;
+                        }
+                    }
+
+                    // Fallback: If no headers found in 50 rows, try Row 1 anyway
+                    if (!foundHeaders) {
+                        headerRowIndex = 1;
+                        const row = worksheet.getRow(1);
                         row.eachCell((cell, colNumber) => {
-                            const header = headers[colNumber - 1];
-                            if (header) {
-                                let cellValue: any = cell.value;
-                                if (cellValue && typeof cellValue === 'object' && 'result' in cellValue) {
-                                    cellValue = cellValue.result;
+                            headers[colNumber] = cell.value?.toString() || `Column${colNumber}`;
+                        });
+                        foundHeaders = true;
+                    }
+
+                    if (foundHeaders) {
+                        worksheet.eachRow((row, rowNumber) => {
+                            if (rowNumber > headerRowIndex) {
+                                const rowData: any = {};
+                                row.eachCell((cell, colNumber) => {
+                                    const header = headers[colNumber];
+                                    if (header) {
+                                        let cellValue: any = cell.value;
+                                        if (cellValue && typeof cellValue === 'object' && 'result' in cellValue) {
+                                            cellValue = cellValue.result;
+                                        }
+                                        if (cellValue && typeof cellValue === 'object' && 'richText' in cellValue) {
+                                            cellValue = (cellValue as any).richText.map((rt: any) => rt.text).join('');
+                                        }
+                                        rowData[header] = cellValue;
+                                    }
+                                });
+                                // Relaxed Empty Check: Keep row if at least one value exists
+                                if (Object.values(rowData).some(val => val !== null && val !== undefined && val !== '' && String(val).trim() !== '')) {
+                                    currentSheetRows.push(rowData);
                                 }
-                                if (cellValue && typeof cellValue === 'object' && 'richText' in cellValue) {
-                                    cellValue = (cellValue as any).richText.map((rt: any) => rt.text).join('');
-                                }
-                                rowData[header] = cellValue;
                             }
                         });
-                        if (Object.values(rowData).some(val => val !== null && val !== undefined && val !== '')) {
-                            jsonData.push(rowData);
-                        }
+
+                        // Always keep the sheet, even if empty, so the user sees the tab
+                        sheetsData[worksheet.name] = {
+                            data: currentSheetRows,
+                            headers: headers.filter(h => h && h.trim() !== '')
+                        };
                     }
                 });
             }
 
+            // If CSV, `jsonData` is populated, but `sheetsData` is empty.
+            // If Excel, `sheetsData` is populated, `jsonData` is empty.
+            // Let's unify.
             if (jsonData.length > 0) {
-                // Transformation Logic
-                const transformedData = jsonData.map((row: any, index: number) => {
+                // It was a CSV
+                sheetsData["Planilha 1"] = { data: jsonData, headers: Object.keys(jsonData[0] || {}) };
+            }
+
+            // Now Process Each Sheet in sheetsData
+            const finalSheets: Record<string, { data: any[], headers: string[] }> = {};
+            let globalHasData = false;
+
+            Object.keys(sheetsData).forEach(sheetName => {
+                const sheetRows = sheetsData[sheetName].data;
+                // REMOVED: if (sheetRows.length === 0) return; // Keep empty sheets for tabs!
+
+                // Transformation Logic (replicated from original)
+                const transformedData = sheetRows.map((row: any, index: number) => {
                     const newRow: any = { ...row };
 
                     // Normalize standard columns if they exist, but don't force them
@@ -86,14 +158,9 @@ export default function Home() {
                     const firstKey = rowKeys.length > 0 ? rowKeys[0] : null;
 
                     if (firstKey) {
-                        // Use the first column as the ID source logic
-                        // We KEEP the original key (e.g. "Id do Pedido") so it displays correctly headers
-                        // But we also ensure "Chamado" exists for internal routing/logic (hidden id)
                         newRow["Chamado"] = row[firstKey];
-
-                        // We DO NOT delete the original key anymore.
                     } else {
-                        // Fallback if row is empty (unlikely given check)
+                        // Fallback
                         let year = new Date().getFullYear();
                         const padIndex = String(index + 1).padStart(3, '0');
                         newRow["Chamado"] = `CS-${year}-${padIndex}`;
@@ -120,7 +187,7 @@ export default function Home() {
                                 const [year, month, day] = strDate.split('-');
                                 newRow[key] = `${day}/${month}/${year}`;
                             }
-                            // 3. Check for ISO Date with Time (YYYY-MM-DDTHH:mm...)
+                            // 3. Check for ISO Date with Time
                             else if (strDate.match(/^\d{4}-\d{2}-\d{2}T/)) {
                                 const dateObj = new Date(strDate);
                                 if (!isNaN(dateObj.getTime())) {
@@ -130,9 +197,6 @@ export default function Home() {
                                     newRow[key] = `${day}/${month}/${year}`;
                                 }
                             }
-                            // 4. Leave DD/MM/YYYY as is, or try standard Date parse fallback?
-                            // If it's something like MM/DD/YYYY we might be in trouble without user hint, 
-                            // but let's assume if it is NOT YYYY-MM-DD and not numeric, it might be correct or just text.
                         }
                     });
 
@@ -140,41 +204,34 @@ export default function Home() {
                 });
 
                 // Headers Logic
-                // We want to show all Original Keys.
-                // We typically exclude "Chamado" from display if it was auto-generated or duplicated from first key, 
-                // UNLESS "Chamado" was actually the name of the first key.
                 const allKeys = Array.from(new Set(transformedData.flatMap(row => Object.keys(row))));
-
-                // Filter out "Chamado" if we have another key that is acting as the ID (the first key).
-                // Or simply: Use the keys from the first row of original data? 
-                // Better: Filter out "Chamado" if it's not in the original file's header set?
-                // But we don't have original header set easily here due to flatMap.
-                // Let's rely on checking if "Chamado" is strictly needed.
-
-                // If the user uploaded a file with "Chamado", keep it.
-                // If we generated "Chamado" as a dupe of "Id do Pedido", hide it.
-                // Simple heuristic: If "Chamado" is NOT the first key of the new rows (which might be "Id do Pedido" + "Chamado"), hide it?
-                // actually transformedData row keys order might be mixed.
-
-                // Best bet: Filter "Chamado" if "Chamado" is DIFFERENT from the link value source key?
-                // Simpler: Just exclude "Chamado" from headers if `jsonData` keys didn't include it?
-                const originalKeys = Object.keys(jsonData[0] || {});
+                const originalKeys = Object.keys(sheetRows[0] || {});
                 const hasOriginalChamado = originalKeys.some(k => k.trim().toLowerCase() === "chamado");
 
-                // Filter out "Chamado" if it wasn't in the original file
                 const visibleHeaders = allKeys.filter(k => {
                     if (k === "Chamado" && !hasOriginalChamado) return false;
                     return true;
                 });
 
-                // Sort: First Key First (ID), then others.
-                // We use a Set to prevent duplicates in case logic allows them.
                 const sortedHeaders = Array.from(new Set([
-                    ...originalKeys.filter(k => visibleHeaders.includes(k)), // Keep original order
-                    ...visibleHeaders.filter(k => !originalKeys.includes(k)) // Append any new ones
+                    ...originalKeys.filter(k => visibleHeaders.includes(k)),
+                    ...visibleHeaders.filter(k => !originalKeys.includes(k))
                 ]));
 
-                // Save to Database
+                finalSheets[sheetName] = { data: transformedData, headers: sortedHeaders };
+                globalHasData = true;
+            });
+
+            if (globalHasData) {
+                // Save to Database (We'll save the PRIMARY/FIRST sheet to DB for now, or need API update)
+                // Since this is a "Fake" DB save (mock), we can just save the metadata or first sheet.
+                // Or we can construct a "merged" row set for the DB? 
+                // For now, let's just save the file metadata and use `setSheets` for local state.
+
+                // Note: The /api/files endpoint might expect `rows`. We'll send the FIRST sheet's rows.
+                const firstSheetName = Object.keys(finalSheets)[0];
+                const firstSheetData = finalSheets[firstSheetName];
+
                 try {
                     const response = await fetch('/api/files', {
                         method: 'POST',
@@ -182,7 +239,7 @@ export default function Home() {
                         body: JSON.stringify({
                             name: file.name,
                             size: file.size,
-                            rows: transformedData
+                            rows: firstSheetData.data // Saving first sheet to keep API happy
                         })
                     });
 
@@ -191,11 +248,15 @@ export default function Home() {
                     const savedFile = await response.json();
 
                     toast.success("Arquivo Processado", "Os dados foram importados com sucesso.");
-                    setFileData(transformedData, sortedHeaders, file.name, savedFile.id);
+
+                    // NEW: Use setSheets instead of setFileData
+                    setSheets(finalSheets, file.name, savedFile.id);
 
                 } catch (dbError) {
                     console.error("Erro de persistência:", dbError);
                     toast.error("Erro ao Salvar", "Falha ao salvar no banco, mas carregando visualização...");
+                    // Fallback local load
+                    setSheets(finalSheets, file.name, "local-id");
                 }
 
                 router.push("/editor");
