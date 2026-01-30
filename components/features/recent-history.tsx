@@ -46,7 +46,7 @@ export function RecentHistory() {
     const [loading, setLoading] = useState(true);
     const [isExpanded, setIsExpanded] = useState(false); // Added isExpanded state
     const router = useRouter();
-    const { setFileData } = useAppStore();
+    const { setFileData, setSheets } = useAppStore();
     const toast = useToast();
 
     useEffect(() => {
@@ -76,9 +76,41 @@ export function RecentHistory() {
             if (fileData.rows && fileData.rows.length > 0) {
                 // Parse the JSON string data from each row
                 const parsedRows = fileData.rows.map((row: any) => JSON.parse(row.data));
-                const headers = Object.keys(parsedRows[0]);
 
-                setFileData(parsedRows, headers, fileData.name, fileData.id);
+                // reconstruct sheets if metadata exists
+                const sheets: Record<string, { data: any[], headers: string[] }> = {};
+                let hasSheetMeta = false;
+
+                parsedRows.forEach((row: any) => {
+                    if (row.__sheetName__) {
+                        hasSheetMeta = true;
+                        const sheetName = row.__sheetName__;
+                        // Remove metadata for display
+                        const { __sheetName__, ...cleanRow } = row;
+
+                        if (!sheets[sheetName]) {
+                            sheets[sheetName] = { data: [], headers: [] };
+                        }
+                        sheets[sheetName].data.push(cleanRow);
+                    }
+                });
+
+                if (hasSheetMeta) {
+                    // Extract headers for each sheet
+                    Object.keys(sheets).forEach(name => {
+                        const data = sheets[name].data;
+                        if (data.length > 0) {
+                            sheets[name].headers = Object.keys(data[0]);
+                        }
+                    });
+
+                    setSheets(sheets, fileData.name, fileData.id);
+                } else {
+                    // Fallback for legacy files (no sheet meta)
+                    const headers = Object.keys(parsedRows[0]);
+                    setFileData(parsedRows, headers, fileData.name, fileData.id);
+                }
+
                 toast.success("Arquivo Aberto", `O arquivo "${fileData.name}" foi carregado com sucesso.`);
                 router.push("/editor");
             } else {

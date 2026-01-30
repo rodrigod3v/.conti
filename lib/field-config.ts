@@ -124,13 +124,35 @@ export function getFieldConfig(fieldName: string): FieldConfig {
         return { type: 'date' };
     }
 
+    if (normalizedName.includes('quantidade') ||
+        normalizedName.includes('qtd') ||
+        normalizedName.includes('estoque') ||
+        normalizedName.includes('numero')) {
+        return { type: 'numeric' };
+    }
+
+    // Force PCC and certain codes to be TEXT, even if they have "Valor" in the name
+    if (normalizedName.includes('pcc') || 
+        normalizedName.includes('cpf') || 
+        normalizedName.includes('cnpj')) {
+        return { type: 'text' };
+    }
+
     if (normalizedName.includes('valor') || 
         normalizedName.includes('preco') || 
         normalizedName.includes('custo') ||
         normalizedName.includes('total') ||
         normalizedName.includes('montante') ||
         normalizedName.includes('receita') ||
-        normalizedName.includes('despesa')) {
+        normalizedName.includes('despesa') ||
+        // Tax fields heuristic
+        normalizedName === 'ir' ||
+        normalizedName.includes(' ir ') || 
+        normalizedName.endsWith(' ir') ||
+        normalizedName.startsWith('ir ') ||
+        normalizedName.includes('iss') ||
+        normalizedName.includes('imposto') ||
+        normalizedName.includes('taxa')) {
         return { type: 'currency', formatCurrency: true };
     }
     

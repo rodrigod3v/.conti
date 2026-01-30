@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useAppStore } from "@/lib/store";
+import { getStatusColor } from "@/lib/status-utils";
 import {
     Table,
     TableBody,
@@ -60,32 +61,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // --- Helper Components ---
 
 const StatusBadge = ({ status }: { status: string }) => {
-    // Normalizing status for comparison
-    const s = status?.toString().toLowerCase().trim() || "";
-
-    if (s.includes("pago") && !s.includes("parcial")) {
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">{status}</Badge>;
-    }
-    if (s.includes("parcialmente") || s.includes("parcial")) {
-        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">{status}</Badge>;
-    }
-    if (s.includes("cancelado")) {
-        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-none">{status}</Badge>;
-    }
-    if (s === "pendente" || s.includes("aguardando")) {
-        return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none">{status}</Badge>;
-    }
-    if (s === "aprovado" || s === "concluído" || s === "concluido" || s === "resolvido" || s === "ok") {
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">{status}</Badge>;
-    }
-    if (s === "erro" || s === "missing") {
-        return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-none">{status}</Badge>;
-    }
-    if (s.includes("análise") || s.includes("analise") || s.includes("andamento")) {
-        return <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-none">{status}</Badge>;
-    }
-
-    return <Badge variant="secondary">{status}</Badge>;
+    return <Badge className={`${getStatusColor(status)} border-none`}>{status}</Badge>;
 };
 
 const ActionsCell = ({ rowId }: { rowId: number }) => {
@@ -240,6 +216,12 @@ const EditableCell = ({
     if (fieldConfig.type === 'currency' || (fieldConfig.type === 'numeric' && fieldConfig.formatCurrency)) {
         const formatCurrency = (val: string) => {
             if (!val) return "";
+
+            // STRICT CHECK: If it contains letters (except R$), do not format
+            // This prevents codes like "ABC-123" from being mangled or pure text from disappearing
+            const hasLetters = /[a-zA-Z]/.test(val.replace(/R\$/gi, "").trim());
+            if (hasLetters) return val;
+
             // Remove non-numeric except comma/dot/minus
             const clean = val.replace(/[^\d,\.-]/g, "");
             if (!clean) return "";
@@ -289,7 +271,10 @@ const EditableCell = ({
     // 5. Default Text Input
     return (
         <Input
-            className="h-8 w-full border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary/20 bg-transparent px-2 text-xs min-w-[150px]"
+            className={cn(
+                "h-8 w-full border-transparent hover:border-border focus:border-primary focus:ring-1 focus:ring-primary/20 bg-transparent px-2 text-xs min-w-[150px]",
+                fieldConfig.type === 'numeric' && "text-right font-mono"
+            )}
             value={value}
             onChange={(e) => updateCell(globalIndex, header, e.target.value)}
         />
@@ -588,24 +573,43 @@ export function DataEditor() {
     };
 
     const handleExport = async () => {
-        if (!fileData || fileData.length === 0) return;
+        const { fileData, headers, fileName, sheets } = useAppStore.getState();
+        if ((!fileData || fileData.length === 0) && (!sheets || Object.keys(sheets).length === 0)) return;
 
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet("Dados");
 
-        // Add headers
-        if (headers && headers.length > 0) {
-            worksheet.columns = headers.map(header => ({
-                header: header,
-                key: header,
-                width: 15
-            }));
+        if (sheets && Object.keys(sheets).length > 0) {
+            Object.entries(sheets).forEach(([sheetName, sheetContent]) => {
+                // Sanitize sheet name (Excel max 31 chars, no special chars)
+                const safeName = sheetName.replace(/[\\/?*[\]]/g, "").substring(0, 31) || "Sheet";
+                const worksheet = workbook.addWorksheet(safeName);
+
+                if (sheetContent.headers && sheetContent.headers.length > 0) {
+                    worksheet.columns = sheetContent.headers.map(header => ({
+                        header: header,
+                        key: header,
+                        width: 15
+                    }));
+                }
+
+                sheetContent.data.forEach(row => {
+                    worksheet.addRow(row);
+                });
+            });
+        } else {
+            // Fallback for single sheet legacy support
+            const worksheet = workbook.addWorksheet("Dados");
+            if (headers && headers.length > 0) {
+                worksheet.columns = headers.map(header => ({
+                    header: header,
+                    key: header,
+                    width: 15
+                }));
+            }
+            fileData.forEach(row => {
+                worksheet.addRow(row);
+            });
         }
-
-        // Add data rows
-        fileData.forEach(row => {
-            worksheet.addRow(row);
-        });
 
         // Generate file
         const exportName = fileName ? `${fileName.replace(/\.[^/.]+$/, "")}_editado.xlsx` : "dados_exportados.xlsx";
@@ -634,16 +638,18 @@ export function DataEditor() {
 
             let displayValue: React.ReactNode = value || "CS-Link";
 
-            // Try to format if it looks like a date (Object or ISO String)
+            // Try to format if it looks like a date (Object or ISO String or Standard Date String)
             if (value instanceof Date) {
                 try {
                     displayValue = format(value, "dd/MM/yyyy");
                 } catch (e) { }
-            } else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-                // Handle ISO strings like 2026-01-28T00...
-                const d = new Date(value);
-                if (!isNaN(d.getTime())) {
-                    displayValue = format(d, "dd/MM/yyyy");
+            } else if (typeof value === 'string') {
+                // Handle ISO strings (2026-01-28...) OR Standard JS Date Strings (Tue Jan 27 2026...)
+                if (/^\d{4}-\d{2}-\d{2}/.test(value) || /^\w{3} \w{3} \d{2} \d{4}/.test(value) || value.includes("GMT")) {
+                    const d = new Date(value);
+                    if (!isNaN(d.getTime())) {
+                        displayValue = format(d, "dd/MM/yyyy");
+                    }
                 }
             } else if (typeof value === 'object' && value !== null) {
                 displayValue = JSON.stringify(value);
@@ -749,6 +755,8 @@ export function DataEditor() {
 
             <NewCaseWizard open={isWizardOpen} onOpenChange={setIsWizardOpen} />
 
+
+
             {/* Filters Section */}
             <div className="flex flex-col gap-3 rounded-lg border bg-card p-2 md:flex-row md:items-center bg-white shrink-0">
                 <div className="relative flex-1">
@@ -836,6 +844,34 @@ export function DataEditor() {
                 </div>
             </div>
 
+            {/* Sheets Tabs - Moved and Styled */}
+            {sheets && Object.keys(sheets).length > 1 && (
+                <div className="shrink-0 mt-2 mb-4 px-1">
+                    <Tabs
+                        value={activeSheet || Object.keys(sheets)[0]}
+                        onValueChange={(val) => changeSheet(val)}
+                        className="w-full"
+                    >
+                        <TabsList className="w-full justify-start h-auto bg-transparent p-0 gap-2 overflow-x-auto border-b border-transparent">
+                            {Object.keys(sheets).map((sheetName) => (
+                                <TabsTrigger
+                                    key={sheetName}
+                                    value={sheetName}
+                                    className="
+                                        data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-black/5
+                                        text-muted-foreground hover:text-foreground hover:bg-muted/50
+                                        rounded-md px-4 py-2 h-9 transition-all font-medium text-sm
+                                        flex items-center gap-2 border border-transparent
+                                    "
+                                >
+                                    {sheetName}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
+                </div>
+            )}
+
 
             {/* Table Section */}
             <div className="rounded-lg border bg-white shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -854,7 +890,8 @@ export function DataEditor() {
                                 </TableHead>
                                 {headers.map((header) => {
                                     const fieldConfig = getFieldConfig(header);
-                                    const isNumeric = fieldConfig.type === 'currency';
+                                    // FIX: Check for both currency AND numeric for right alignment
+                                    const isNumeric = fieldConfig.type === 'currency' || fieldConfig.type === 'numeric';
                                     const isStatus = header.toLowerCase() === "status";
 
                                     // Custom widths for headers
@@ -1037,19 +1074,65 @@ export function DataEditor() {
                                                 <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                     Novo Valor
                                                 </label>
-                                                <Select value={bulkEditValue} onValueChange={setBulkEditValue}>
-                                                    <SelectTrigger className="w-full">
-                                                        <SelectValue placeholder="Selecione o novo valor..." />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="max-h-[300px]">
-                                                        {allUniqueValues[bulkEditColumn]?.map(val => (
-                                                            <SelectItem key={val} value={val}>{val}</SelectItem>
-                                                        ))}
-                                                        {!allUniqueValues[bulkEditColumn]?.includes(bulkEditValue) && bulkEditValue && (
-                                                            <SelectItem value={bulkEditValue}>{bulkEditValue}</SelectItem>
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
+
+                                                {(() => {
+                                                    const config = getFieldConfig(bulkEditColumn);
+
+                                                    // Rule: Currency, Numeric, and Textarea (Description) should be Inputs. Everything else is Selectable.
+                                                    if (config.type === 'currency' || config.type === 'numeric' || config.type === 'textarea') {
+                                                        return (
+                                                            <div className="relative">
+                                                                {config.type === 'currency' && <span className="absolute left-3 top-2.5 text-muted-foreground">R$</span>}
+                                                                {config.type === 'textarea' ? (
+                                                                    <Textarea
+                                                                        value={bulkEditValue}
+                                                                        onChange={(e) => setBulkEditValue(e.target.value)}
+                                                                        placeholder="Digite a descrição..."
+                                                                        className="min-h-[80px]"
+                                                                    />
+                                                                ) : (
+                                                                    <Input
+                                                                        value={bulkEditValue}
+                                                                        onChange={(e) => {
+                                                                            if (config.type === 'currency') {
+                                                                                // Currency Mask
+                                                                                let val = e.target.value.replace(/\D/g, "");
+                                                                                val = (Number(val) / 100).toFixed(2)
+                                                                                    .replace(".", ",")
+                                                                                    .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                                                                                setBulkEditValue(val);
+                                                                            } else {
+                                                                                // Numeric (just store value)
+                                                                                setBulkEditValue(e.target.value);
+                                                                            }
+                                                                        }}
+                                                                        className={config.type === 'currency' ? "pl-9" : ""}
+                                                                        placeholder={config.type === 'currency' ? "0,00" : "Digite o número..."}
+                                                                        type={config.type === 'numeric' ? "number" : "text"}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    // For EVERYTHING else (Text, Dropdown, Date, etc.) -> Use Select
+                                                    return (
+                                                        <Select value={bulkEditValue} onValueChange={setBulkEditValue}>
+                                                            <SelectTrigger className="w-full">
+                                                                <SelectValue placeholder="Selecione o novo valor..." />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="max-h-[300px]">
+                                                                {allUniqueValues[bulkEditColumn]?.map(val => (
+                                                                    <SelectItem key={val} value={val}>{val}</SelectItem>
+                                                                ))}
+                                                                {!allUniqueValues[bulkEditColumn]?.includes(bulkEditValue) && bulkEditValue && (
+                                                                    <SelectItem value={bulkEditValue}>{bulkEditValue}</SelectItem>
+                                                                )}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    );
+                                                })()}
+
                                                 <p className="text-[11px] text-muted-foreground pt-1">
                                                     Isso substituirá o valor atual em todos os itens selecionados.
                                                 </p>

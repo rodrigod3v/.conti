@@ -30,9 +30,12 @@ export default function Home() {
                 const text = textDecoder.decode(buffer);
                 const lines = text.split('\n').filter(line => line.trim());
                 if (lines.length > 0) {
-                    const headers = lines[0].split(',').map(h => h.trim());
+                    const firstLine = lines[0];
+                    const separator = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+
+                    const headers = firstLine.split(separator).map(h => h.trim());
                     jsonData = lines.slice(1).map(line => {
-                        const values = line.split(',');
+                        const values = line.split(separator);
                         const row: any = {};
                         headers.forEach((header, index) => {
                             row[header] = values[index]?.trim() || '';
@@ -59,72 +62,126 @@ export default function Home() {
                 await workbook.xlsx.load(buffer);
 
                 // Iterate over ALL sheets
+                // Iterate over ALL sheets
                 workbook.eachSheet((worksheet, sheetId) => {
-                    const currentSheetRows: any[] = [];
+                    const worksheetName = worksheet.name;
+                    if (worksheet) {
+                        const currentSheetRows: any[] = [];
 
-                    // Dynamic Header Detection: Find first row with content
-                    let headerRowIndex = 1;
-                    let headers: string[] = [];
-                    let foundHeaders = false;
+                        // --- SMART CSV DETECTION (Robust) ---
+                        // Check first non-empty row to see if it's a semicolon-separated mess
+                        const firstRow = worksheet.getRow(1);
+                        const firstCellText = firstRow.getCell(1).text || "";
+                        const semicolonCount = (firstCellText.match(/;/g) || []).length;
 
-                    // Scan first 50 rows for header candidates
-                    for (let r = 1; r <= 50; r++) {
-                        const row = worksheet.getRow(r);
-                        if (row.actualCellCount > 0) {
-                            // Assume this is the header row
-                            headerRowIndex = r;
-                            foundHeaders = true;
+                        // Condition: Relaxed logic.
+                        // If we have >= 3 semicolons in the first cell, assume it's a CSV paste.
+                        // Legit headers almost never have 3+ semicolons.
+                        // We ignore the second cell state because it might contain phantom data/spaces.
+                        const looksLikeSemicolonCSV = semicolonCount >= 3 || (semicolonCount >= 1 && firstCellText.includes(";") && (!firstRow.getCell(2).text?.trim()));
 
-                            row.eachCell((cell, colNumber) => {
-                                headers[colNumber] = cell.value?.toString() || `Column${colNumber}`;
-                            });
-                            // Fill sparse array gaps
-                            for (let i = 1; i < headers.length; i++) {
-                                if (!headers[i]) headers[i] = `Column${i}`;
-                            }
-                            break;
-                        }
-                    }
+                        if (looksLikeSemicolonCSV) {
+                            // --- REPAIR MODE: Split by Semicolon ---
+                            const headers = firstCellText.split(";").map(h => h.trim());
 
-                    // Fallback: If no headers found in 50 rows, try Row 1 anyway
-                    if (!foundHeaders) {
-                        headerRowIndex = 1;
-                        const row = worksheet.getRow(1);
-                        row.eachCell((cell, colNumber) => {
-                            headers[colNumber] = cell.value?.toString() || `Column${colNumber}`;
-                        });
-                        foundHeaders = true;
-                    }
+                            worksheet.eachRow((row, rowNumber) => {
+                                if (rowNumber === 1) return; // Skip header
 
-                    if (foundHeaders) {
-                        worksheet.eachRow((row, rowNumber) => {
-                            if (rowNumber > headerRowIndex) {
-                                const rowData: any = {};
-                                row.eachCell((cell, colNumber) => {
-                                    const header = headers[colNumber];
-                                    if (header) {
-                                        let cellValue: any = cell.value;
-                                        if (cellValue && typeof cellValue === 'object' && 'result' in cellValue) {
-                                            cellValue = cellValue.result;
-                                        }
-                                        if (cellValue && typeof cellValue === 'object' && 'richText' in cellValue) {
-                                            cellValue = (cellValue as any).richText.map((rt: any) => rt.text).join('');
-                                        }
-                                        rowData[header] = cellValue;
-                                    }
+                                // Get the raw line from the first cell
+                                const rowContent = row.getCell(1).text || "";
+                                if (!rowContent.trim()) return;
+
+                                const values = rowContent.split(";");
+                                const rowObject: any = {};
+
+                                headers.forEach((header, index) => {
+                                    let val = values[index]?.trim();
+                                    rowObject[header] = val;
                                 });
-                                // Relaxed Empty Check: Keep row if at least one value exists
-                                if (Object.values(rowData).some(val => val !== null && val !== undefined && val !== '' && String(val).trim() !== '')) {
-                                    currentSheetRows.push(rowData);
+                                currentSheetRows.push(rowObject);
+                            });
+
+                            if (currentSheetRows.length >= 0) {
+                                sheetsData[worksheetName] = {
+                                    data: currentSheetRows,
+                                    headers: headers.filter(h => h && h.trim() !== '')
+                                };
+                            }
+
+                        } else {
+                            // --- STANDARD EXCEL PARSING (Existing Logic) ---
+                            // Smart Header Detection
+                            let bestHeaderRow = 1;
+                            let maxScore = -1;
+                            let bestHeaders: string[] = [];
+
+                            // Scan first 50 rows
+                            for (let r = 1; r <= Math.min(50, worksheet.rowCount); r++) {
+                                const row = worksheet.getRow(r);
+                                if (row.actualCellCount === 0) continue;
+
+                                let score = 0;
+                                let rowHeaders: string[] = [];
+                                let nonEmptyCount = 0;
+
+                                row.eachCell((cell, colNumber) => {
+                                    const val = cell.value?.toString().toLowerCase().trim() || "";
+                                    if (val) nonEmptyCount++;
+                                    if (val.includes("data") || val.includes("date") || val.includes("status") || val.includes("valor") || val.includes("total") || val.includes("chamado") || val.includes("id")) score += 2;
+                                    if (/^\d+$/.test(val)) score -= 1;
+                                    rowHeaders[colNumber] = cell.value?.toString() || `Column${colNumber}`;
+                                });
+                                score += nonEmptyCount;
+
+                                if (score > maxScore) {
+                                    maxScore = score;
+                                    bestHeaderRow = r;
+                                    bestHeaders = rowHeaders;
                                 }
                             }
-                        });
 
-                        // Always keep the sheet, even if empty, so the user sees the tab
-                        sheetsData[worksheet.name] = {
-                            data: currentSheetRows,
-                            headers: headers.filter(h => h && h.trim() !== '')
-                        };
+                            // Fill gaps
+                            for (let i = 1; i < bestHeaders.length; i++) {
+                                if (!bestHeaders[i]) bestHeaders[i] = `Column${i}`;
+                            }
+                            if (maxScore <= 0) {
+                                const row = worksheet.getRow(1);
+                                row.eachCell((cell, colNumber) => {
+                                    bestHeaders[colNumber] = cell.value?.toString() || `Column${colNumber}`;
+                                });
+                                bestHeaderRow = 1;
+                            }
+
+                            // Parse Data
+                            worksheet.eachRow((row, rowNumber) => {
+                                if (rowNumber > bestHeaderRow) {
+                                    const rowData: any = {};
+                                    let hasData = false;
+                                    row.eachCell((cell, colNumber) => {
+                                        const header = bestHeaders[colNumber];
+                                        if (header) {
+                                            let cellValue: any = cell.value;
+                                            if (cellValue && typeof cellValue === 'object') {
+                                                if ('result' in cellValue) cellValue = cellValue.result;
+                                                else if ('text' in cellValue) cellValue = cellValue.text;
+                                                else if ('richText' in cellValue) cellValue = (cellValue as any).richText.map((rt: any) => rt.text).join('');
+                                                else cellValue = String(cellValue);
+                                            }
+                                            rowData[header] = cellValue;
+                                            if (cellValue !== null && cellValue !== undefined && String(cellValue).trim() !== '') hasData = true;
+                                        }
+                                    });
+                                    if (hasData) currentSheetRows.push(rowData);
+                                }
+                            });
+
+                            if (currentSheetRows.length >= 0) {
+                                sheetsData[worksheetName] = {
+                                    data: currentSheetRows,
+                                    headers: bestHeaders.filter(h => h && h.trim() !== '')
+                                };
+                            }
+                        }
                     }
                 });
             }
@@ -229,8 +286,15 @@ export default function Home() {
                 // For now, let's just save the file metadata and use `setSheets` for local state.
 
                 // Note: The /api/files endpoint might expect `rows`. We'll send the FIRST sheet's rows.
-                const firstSheetName = Object.keys(finalSheets)[0];
-                const firstSheetData = finalSheets[firstSheetName];
+                // Flatten all sheets into a single array for DB persistence
+                // We add a "__sheetName__" property to each row so we can reconstruct them later
+                const allRowsForDB: any[] = [];
+
+                Object.keys(finalSheets).forEach(sheetName => {
+                    const rows = finalSheets[sheetName].data;
+                    const rowsWithMeta = rows.map(r => ({ ...r, __sheetName__: sheetName }));
+                    allRowsForDB.push(...rowsWithMeta);
+                });
 
                 try {
                     const response = await fetch('/api/files', {
@@ -239,7 +303,7 @@ export default function Home() {
                         body: JSON.stringify({
                             name: file.name,
                             size: file.size,
-                            rows: firstSheetData.data // Saving first sheet to keep API happy
+                            rows: allRowsForDB // Saving ALL sheets with metadata
                         })
                     });
 
